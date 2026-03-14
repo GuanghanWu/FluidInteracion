@@ -1,0 +1,15 @@
+{
+  "name": "fluid-mvp",
+  "version": "1.0.0",
+  "description": "SPH Fluid Simulation with Three.js and Metaballs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "vite": "^5.0.0"
+  }
+}

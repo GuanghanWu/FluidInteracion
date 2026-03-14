@@ -186,11 +186,21 @@ function render() {
   // 清空场景
   scene.clear();
   
+  // 调试：显示粒子数量
+  const particleCount = solver.particles.length;
+  document.getElementById('count').textContent = particleCount;
+  
+  if (particleCount === 0) {
+    console.warn('No particles to render');
+    renderer.render(scene, camera);
+    return;
+  }
+  
   // 创建粒子几何体
   const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(solver.particles.length * 3);
+  const positions = new Float32Array(particleCount * 3);
   
-  for (let i = 0; i < solver.particles.length; i++) {
+  for (let i = 0; i < particleCount; i++) {
     const p = solver.particles[i];
     positions[i * 3] = p.x;
     positions[i * 3 + 1] = p.y;
@@ -199,13 +209,14 @@ function render() {
   
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   
-  // 创建粒子材质（简单点渲染，后续替换为 Metaballs Shader）
+  // 创建粒子材质
   const material = new THREE.PointsMaterial({
     color: CONFIG.color,
-    size: CONFIG.particleRadius * 2,
+    size: CONFIG.particleRadius * 5, // 加大粒子尺寸
     transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: false // 禁用尺寸衰减
   });
   
   const points = new THREE.Points(geometry, material);

@@ -30,16 +30,26 @@ function init() {
   // Three.js 场景
   scene = new THREE.Scene();
   
+  // 适配移动端
+  const aspect = window.innerWidth / window.innerHeight;
+  const frustumSize = 2;
+  
   camera = new THREE.OrthographicCamera(
-    -CONFIG.bounds.x, CONFIG.bounds.x,
-    -CONFIG.bounds.y, CONFIG.bounds.y,
+    -frustumSize * aspect, frustumSize * aspect,
+    frustumSize, -frustumSize,
     0.1, 1000
   );
   camera.position.z = 10;
   
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  // WebGL 渲染器（移动端优化）
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: false,
+    preserveDrawingBuffer: false
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 1);
   document.body.appendChild(renderer.domElement);
   
   // 初始化 SPH 求解器
@@ -65,11 +75,18 @@ function init() {
     }
   }
   
-  // 事件监听
+  // 事件监听（移动端 + 桌面端）
   window.addEventListener('resize', onResize);
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mousedown', () => mouse.isDown = true);
-  window.addEventListener('mouseup', () => mouse.isDown = false);
+  
+  // 触摸事件
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+  renderer.domElement.addEventListener('touchend', onTouchEnd);
+  
+  // 鼠标事件
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mousedown', () => mouse.isDown = true);
+  renderer.domElement.addEventListener('mouseup', () => mouse.isDown = false);
   
   console.log('Fluid Simulation MVP initialized');
   console.log(`Particles: ${solver.particles.length}`);
@@ -83,13 +100,41 @@ function onResize() {
 
 function onMouseMove(e) {
   // 转换鼠标坐标到世界空间
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   
   // 鼠标按下时添加粒子
   if (mouse.isDown) {
     solver.addParticle(mouse.x * CONFIG.bounds.x, mouse.y * CONFIG.bounds.y);
   }
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+  mouse.isDown = true;
+  
+  // 添加粒子
+  solver.addParticle(mouse.x * CONFIG.bounds.x, mouse.y * CONFIG.bounds.y);
+}
+
+function onTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+  
+  // 拖动时添加粒子
+  solver.addParticle(mouse.x * CONFIG.bounds.x, mouse.y * CONFIG.bounds.y);
+}
+
+function onTouchEnd() {
+  mouse.isDown = false;
 }
 
 function animate() {

@@ -23,10 +23,26 @@ let frameCount = 0;
 let lastTime = performance.now();
 
 // 初始化
-init();
-animate();
+try {
+  init();
+  animate();
+} catch (error) {
+  console.error('Initialization error:', error);
+  document.getElementById('info').innerHTML = `
+    <div style="color: red; font-size: 16px;">
+      错误：${error.message}<br>
+      WebGL 支持：${!!window.WebGLRenderingContext}<br>
+      Three.js 版本：${THREE.REVISION}
+    </div>
+  `;
+}
 
 function init() {
+  // 检查 WebGL 支持
+  if (!window.WebGLRenderingContext) {
+    throw new Error('浏览器不支持 WebGL');
+  }
+  
   // Three.js 场景
   scene = new THREE.Scene();
   
@@ -47,6 +63,13 @@ function init() {
     alpha: false,
     preserveDrawingBuffer: false
   });
+  
+  // 检查 WebGL 是否可用
+  const gl = renderer.getContext();
+  if (!gl) {
+    throw new Error('无法创建 WebGL 上下文');
+  }
+  
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 1);

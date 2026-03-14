@@ -72,7 +72,8 @@ function init() {
   
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 1);
+  renderer.setClearColor(0x000000, 1); // 纯黑背景
+  document.body.style.backgroundColor = '#000000'; // 确保背景黑色
   document.body.appendChild(renderer.domElement);
   
   // 初始化 SPH 求解器
@@ -209,14 +210,15 @@ function render() {
   
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   
-  // 创建粒子材质
+  // 创建粒子材质（移动端优化：大尺寸 + 亮色）
   const material = new THREE.PointsMaterial({
-    color: CONFIG.color,
-    size: CONFIG.particleRadius * 5, // 加大粒子尺寸
+    color: 0x00ffff, // 青色（更亮）
+    size: 15, // 固定大尺寸（像素单位）
     transparent: true,
-    opacity: 0.9,
+    opacity: 1.0,
     blending: THREE.AdditiveBlending,
-    sizeAttenuation: false // 禁用尺寸衰减
+    sizeAttenuation: false, // 禁用尺寸衰减
+    depthWrite: false
   });
   
   const points = new THREE.Points(geometry, material);

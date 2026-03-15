@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.09
+ * Version: 0.10
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -150,32 +150,45 @@ function init() {
 function setupControls() {
   // 粒子数量
   const particleCountSlider = document.getElementById('particleCount');
+  const particleCountVal = document.getElementById('particleCountVal');
   particleCountSlider.addEventListener('input', (e) => {
-    CONFIG.particleCount = parseInt(e.target.value);
-    // 调整粒子数量
-    while (solver.particles.length > CONFIG.particleCount) {
+    const val = parseInt(e.target.value);
+    CONFIG.particleCount = val;
+    particleCountVal.textContent = val;
+    solver.maxParticles = val;
+    // 如果当前粒子太多，删除一些
+    while (solver.particles.length > val) {
       solver.particles.pop();
     }
   });
   
   // 重力
   const gravitySlider = document.getElementById('gravity');
+  const gravityVal = document.getElementById('gravityVal');
   gravitySlider.addEventListener('input', (e) => {
-    CONFIG.gravity.y = parseFloat(e.target.value);
-    solver.gravity = CONFIG.gravity;
+    const val = parseFloat(e.target.value);
+    CONFIG.gravity.y = val;
+    gravityVal.textContent = val.toFixed(1);
+    solver.gravity.y = val;
   });
   
   // 粘度
   const viscositySlider = document.getElementById('viscosity');
+  const viscosityVal = document.getElementById('viscosityVal');
   viscositySlider.addEventListener('input', (e) => {
-    CONFIG.viscosity = parseFloat(e.target.value);
-    solver.viscosity = CONFIG.viscosity;
+    const val = parseFloat(e.target.value);
+    CONFIG.viscosity = val;
+    viscosityVal.textContent = val.toFixed(2);
+    solver.viscosity = val;
   });
   
   // 鼠标力
   const mouseForceSlider = document.getElementById('mouseForce');
+  const mouseForceVal = document.getElementById('mouseForceVal');
   mouseForceSlider.addEventListener('input', (e) => {
-    CONFIG.mouseForce = parseFloat(e.target.value);
+    const val = parseFloat(e.target.value);
+    CONFIG.mouseForce = val;
+    mouseForceVal.textContent = val.toFixed(1);
   });
 }
 

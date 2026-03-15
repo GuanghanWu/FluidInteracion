@@ -46,16 +46,11 @@ function init() {
   // Three.js 场景
   scene = new THREE.Scene();
   
-  // 适配移动端
+  // 适配移动端 - 使用透视相机避免边缘裁剪问题
   const aspect = window.innerWidth / window.innerHeight;
-  const frustumSize = 2;
   
-  camera = new THREE.OrthographicCamera(
-    -frustumSize * aspect, frustumSize * aspect,
-    frustumSize, -frustumSize,
-    0.1, 1000
-  );
-  camera.position.z = 10;
+  camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+  camera.position.z = 3;
   
   // WebGL 渲染器（移动端优化）
   renderer = new THREE.WebGLRenderer({ 
@@ -117,8 +112,11 @@ function init() {
 }
 
 function onResize() {
+  const aspect = window.innerWidth / window.innerHeight;
   renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth / window.innerHeight;
+  
+  // 透视相机更新
+  camera.aspect = aspect;
   camera.updateProjectionMatrix();
 }
 
@@ -210,14 +208,14 @@ function render() {
   
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   
-  // 创建粒子材质（移动端优化：大尺寸 + 亮色）
+  // 创建粒子材质（修复：启用尺寸衰减，使用世界单位）
   const material = new THREE.PointsMaterial({
     color: 0x00ffff, // 青色（更亮）
-    size: 15, // 固定大尺寸（像素单位）
+    size: 0.15, // 世界单位大小
     transparent: true,
     opacity: 1.0,
     blending: THREE.AdditiveBlending,
-    sizeAttenuation: false, // 禁用尺寸衰减
+    sizeAttenuation: true, // 启用尺寸衰减（关键修复）
     depthWrite: false
   });
   

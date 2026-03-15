@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Main Entry
  * SPH + Verlet + Interactive
- * Version: 0.04
+ * Version: 0.05
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

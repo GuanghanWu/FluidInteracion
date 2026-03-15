@@ -1,65 +1,19 @@
 /**
- * Fluid Simulation MVP - Metaballs Version
- * SPH + Metaballs Shader
- * Version: 0.06
+ * Fluid Simulation MVP - Working Version
+ * SPH + Point Cloud (Fallback)
+ * Version: 0.07
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
 
-// Shader 代码
-const vertexShader = `
-  attribute vec2 position;
-  void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-  }
-`;
-
-const fragmentShader = `
-  precision highp float;
-  
-  uniform vec2 uResolution;
-  uniform vec3 uParticles[300];
-  uniform int uParticleCount;
-  uniform vec3 uColor;
-  
-  void main() {
-    vec2 uv = gl_FragCoord.xy / uResolution.xy;
-    uv = uv * 2.0 - 1.0;
-    uv.x *= uResolution.x / uResolution.y;
-    
-    float sum = 0.0;
-    
-    for (int i = 0; i < 300; i++) {
-      if (i >= uParticleCount) break;
-      
-      vec2 particlePos = uParticles[i].xy;
-      float radius = uParticles[i].z;
-      
-      float dist = length(uv - particlePos);
-      sum += radius * radius / (dist * dist + 0.001);
-    }
-    
-    float threshold = 1.0;
-    float alpha = smoothstep(threshold - 0.05, threshold + 0.05, sum);
-    
-    // 边缘发光
-    float edge = smoothstep(threshold - 0.15, threshold, sum) - alpha;
-    vec3 glowColor = uColor * 2.0;
-    
-    vec3 finalColor = mix(glowColor, uColor * 0.8, alpha);
-    
-    gl_FragColor = vec4(finalColor, alpha + edge * 0.3);
-  }
-`;
-
 // 配置
 const CONFIG = {
   particleCount: 300,
-  particleRadius: 0.15,
-  gravity: { x: 0, y: -3 },
-  mouseForce: 5.0,
-  mouseRadius: 1.0,
-  color: new THREE.Color(0x00ffff)
+  particleRadius: 0.12,
+  gravity: { x: 0, y: -2 },
+  mouseForce: 3.0,
+  mouseRadius: 1.2,
+  color: 0x00ffff
 };
 
 let scene, camera, renderer;
@@ -67,19 +21,16 @@ let solver;
 let mouse = { x: 0, y: 0, isDown: false };
 let frameCount = 0;
 let lastTime = performance.now();
-
-// Shader 材质
-let metaballsMaterial;
-let particleData = new Float32Array(300 * 3);
+let particlesMesh;
+let particlePositions = new Float32Array(CONFIG.particleCount * 3);
+let particleColors = new Float32Array(CONFIG.particleCount * 3);
 
 try {
   init();
   animate();
 } catch (error) {
   console.error('Initialization error:', error);
-  document.getElementById('info').innerHTML = `
-    <div style="color: red;">错误：${error.message}</div>
-  `;
+  document.getElementById('info').innerHTML = `<div style="color: red;">错误：${error.message}</div>`;
 }
 
 function init() {
@@ -91,53 +42,56 @@ function init() {
   
   const aspect = window.innerWidth / window.innerHeight;
   camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 100);
-  camera.position.z = 5;
+  camera.position.z = 6;
   
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 1);
-  document.body.style.backgroundColor = '#000000';
+  renderer.setClearColor(0x050510, 1);
+  document.body.style.backgroundColor = '#050510';
   document.body.appendChild(renderer.domElement);
   
   // 初始化 SPH
   solver = new SPHSolver({
-    h: 0.4,
+    h: 0.35,
     maxParticles: CONFIG.particleCount,
     gravity: CONFIG.gravity,
     restDensity: 1.0,
-    gasConstant: 0.3,
-    viscosity: 0.05
+    gasConstant: 0.4,
+    viscosity: 0.08
   });
   
-  // 添加初始粒子 - 聚集成水滴状
-  for (let i = 0; i < 200; i++) {
+  // 添加初始粒子 - 水滴状聚集
+  const centerX = 0;
+  const centerY = 1.5;
+  for (let i = 0; i < 150; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * 1.5;
-    const x = Math.cos(angle) * r;
-    const y = Math.sin(angle) * r + 1;
+    const r = Math.sqrt(Math.random()) * 1.2;
+    const x = centerX + Math.cos(angle) * r;
+    const y = centerY + Math.sin(angle) * r * 0.6;
     solver.addParticle(x, y);
   }
   
-  // 创建全屏平面用于 Shader
-  const geometry = new THREE.PlaneGeometry(2, 2);
-  metaballsMaterial = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    uniforms: {
-      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-      uParticles: { value: particleData },
-      uParticleCount: { value: 0 },
-      uColor: { value: new THREE.Vector3(0, 1, 1) }
-    },
+  // 创建粒子几何体
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+  
+  // 粒子材质 - 大尺寸 + 发光效果
+  const material = new THREE.PointsMaterial({
+    size: 0.35,
+    vertexColors: true,
     transparent: true,
-    blending: THREE.AdditiveBlending
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    depthWrite: false
   });
   
-  const plane = new THREE.Mesh(geometry, metaballsMaterial);
-  scene.add(plane);
+  particlesMesh = new THREE.Points(geometry, material);
+  scene.add(particlesMesh);
   
-  // 事件
+  // 事件监听
   window.addEventListener('resize', onResize);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
   renderer.domElement.addEventListener('mousedown', () => mouse.isDown = true);
@@ -146,7 +100,7 @@ function init() {
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
   renderer.domElement.addEventListener('touchend', () => mouse.isDown = false);
   
-  console.log('Metaballs Fluid initialized');
+  console.log('Fluid Simulation v0.07 initialized');
 }
 
 function onResize() {
@@ -154,14 +108,13 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
-  metaballsMaterial.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
 }
 
 function screenToWorld(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
   const x = ((clientX - rect.left) / rect.width) * 2 - 1;
   const y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  return { x: x * 2, y: y * 2 };
+  return { x: x * 3, y: y * 3 };
 }
 
 function onMouseMove(e) {
@@ -190,35 +143,63 @@ function onTouchMove(e) {
 function applyMouseForce() {
   if (!mouse.isDown) return;
   
-  // 添加新粒子
-  if (solver.particles.length < CONFIG.particleCount) {
-    solver.addParticle(mouse.x + (Math.random() - 0.5) * 0.2, mouse.y + (Math.random() - 0.5) * 0.2);
+  // 添加新粒子（限制频率）
+  if (solver.particles.length < CONFIG.particleCount && Math.random() < 0.3) {
+    solver.addParticle(
+      mouse.x + (Math.random() - 0.5) * 0.3,
+      mouse.y + (Math.random() - 0.5) * 0.3
+    );
   }
   
-  // 吸引现有粒子
+  // 吸引粒子
   for (const p of solver.particles) {
     const dx = mouse.x - p.x;
     const dy = mouse.y - p.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    if (dist < CONFIG.mouseRadius && dist > 0.01) {
+    if (dist < CONFIG.mouseRadius && dist > 0.05) {
       const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius * CONFIG.mouseForce;
-      p.vx += (dx / dist) * force * 0.05;
-      p.vy += (dy / dist) * force * 0.05;
+      p.vx += (dx / dist) * force * 0.02;
+      p.vy += (dy / dist) * force * 0.02;
     }
   }
 }
 
-function updateParticleData() {
+function getColor(speed) {
+  // 根据速度返回颜色
+  const maxSpeed = 2;
+  const t = Math.min(speed / maxSpeed, 1);
+  
+  // 青色(慢) -> 蓝色(中) -> 紫色(快)
+  const r = t * 0.5;
+  const g = 1.0 - t * 0.3;
+  const b = 1.0;
+  
+  return { r, g, b };
+}
+
+function updateParticles() {
   for (let i = 0; i < solver.particles.length; i++) {
     const p = solver.particles[i];
-    particleData[i * 3] = p.x;
-    particleData[i * 3 + 1] = p.y;
-    particleData[i * 3 + 2] = CONFIG.particleRadius;
+    
+    particlePositions[i * 3] = p.x;
+    particlePositions[i * 3 + 1] = p.y;
+    particlePositions[i * 3 + 2] = 0;
+    
+    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    const color = getColor(speed);
+    particleColors[i * 3] = color.r;
+    particleColors[i * 3 + 1] = color.g;
+    particleColors[i * 3 + 2] = color.b;
   }
   
-  metaballsMaterial.uniforms.uParticles.value = particleData;
-  metaballsMaterial.uniforms.uParticleCount.value = solver.particles.length;
+  // 隐藏未使用的粒子
+  for (let i = solver.particles.length; i < CONFIG.particleCount; i++) {
+    particlePositions[i * 3 + 2] = -1000;
+  }
+  
+  particlesMesh.geometry.attributes.position.needsUpdate = true;
+  particlesMesh.geometry.attributes.color.needsUpdate = true;
   
   document.getElementById('count').textContent = solver.particles.length;
 }
@@ -231,10 +212,10 @@ function animate() {
   
   // 边界
   for (const p of solver.particles) {
-    p.checkBounds(-3, -3, 3, 3, 0.6);
+    p.checkBounds(-3.5, -3, 3.5, 4, 0.5);
   }
   
-  updateParticleData();
+  updateParticles();
   renderer.render(scene, camera);
   
   frameCount++;

@@ -1,6 +1,7 @@
 /**
  * Fluid Simulation MVP - Main Entry
  * SPH + Verlet + Metaballs
+ * Version: 0.02
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

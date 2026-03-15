@@ -79,12 +79,12 @@ function init() {
     gravity: CONFIG.gravity
   });
   
-  // 添加初始粒子（矩形区域）
+  // 添加初始粒子（矩形区域）- 调整范围以适应透视相机
   const cols = 20;
   const rows = 15;
-  const startX = -0.8;
-  const startY = -0.5;
-  const spacing = 0.08;
+  const startX = -1.0;
+  const startY = -0.8;
+  const spacing = 0.1;
   
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {

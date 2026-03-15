@@ -1,19 +1,19 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.08
+ * Version: 0.09
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
 
-// 配置
-const CONFIG = {
+// 配置（会被控制面板覆盖）
+let CONFIG = {
   particleCount: 200,
   particleRadius: 0.15,
   gravity: { x: 0, y: -1.5 },
+  viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
-  // 纹理分辨率（影响性能和效果）
   textureSize: 256
 };
 
@@ -129,7 +129,12 @@ function init() {
   metaballsMesh = new THREE.Mesh(geometry, material);
   scene.add(metaballsMesh);
   
-  // 事件
+  scene.add(metaballsMesh);
+  
+  // 控制面板事件
+  setupControls();
+  
+  // 鼠标/触摸事件
   window.addEventListener('resize', onResize);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
   renderer.domElement.addEventListener('mousedown', () => mouse.isDown = true);
@@ -138,7 +143,40 @@ function init() {
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
   renderer.domElement.addEventListener('touchend', () => mouse.isDown = false);
   
-  console.log('Metaballs Fluid v0.08 initialized');
+  console.log('Metaballs Fluid v0.09 initialized');
+}
+
+// 设置控制面板
+function setupControls() {
+  // 粒子数量
+  const particleCountSlider = document.getElementById('particleCount');
+  particleCountSlider.addEventListener('input', (e) => {
+    CONFIG.particleCount = parseInt(e.target.value);
+    // 调整粒子数量
+    while (solver.particles.length > CONFIG.particleCount) {
+      solver.particles.pop();
+    }
+  });
+  
+  // 重力
+  const gravitySlider = document.getElementById('gravity');
+  gravitySlider.addEventListener('input', (e) => {
+    CONFIG.gravity.y = parseFloat(e.target.value);
+    solver.gravity = CONFIG.gravity;
+  });
+  
+  // 粘度
+  const viscositySlider = document.getElementById('viscosity');
+  viscositySlider.addEventListener('input', (e) => {
+    CONFIG.viscosity = parseFloat(e.target.value);
+    solver.viscosity = CONFIG.viscosity;
+  });
+  
+  // 鼠标力
+  const mouseForceSlider = document.getElementById('mouseForce');
+  mouseForceSlider.addEventListener('input', (e) => {
+    CONFIG.mouseForce = parseFloat(e.target.value);
+  });
 }
 
 function onResize() {

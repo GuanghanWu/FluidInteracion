@@ -1,36 +1,40 @@
-// Metaballs 片段着色器
+// Metaballs Fragment Shader
 precision highp float;
 
-uniform vec2 u_resolution;
-uniform vec3 u_particles[500]; // xy=位置，z=半径
-uniform int u_particleCount;
-uniform vec3 u_color;
+uniform vec2 uResolution;
+uniform vec3 uParticles[300]; // x, y, radius
+uniform int uParticleCount;
+uniform vec3 uColor;
 
 void main() {
-  vec2 uv = gl_FragCoord.xy / u_resolution;
+  vec2 uv = gl_FragCoord.xy / uResolution.xy;
+  uv = uv * 2.0 - 1.0;
+  uv.x *= uResolution.x / uResolution.y;
   
   float sum = 0.0;
   
-  // 累加所有粒子的影响
-  for (int i = 0; i < u_particleCount; i++) {
-    vec2 pos = u_particles[i].xy;
-    float r = u_particles[i].z;
+  // 计算到所有粒子的距离场
+  for (int i = 0; i < 300; i++) {
+    if (i >= uParticleCount) break;
     
-    // 转换到屏幕空间
-    vec2 screenPos = pos / u_resolution;
-    float dist = distance(uv, screenPos);
+    vec2 particlePos = uParticles[i].xy;
+    float radius = uParticles[i].z;
     
-    // Metaballs 阈值函数
-    float influence = smoothstep(r, r * 0.5, dist);
-    sum += influence;
+    float dist = length(uv - particlePos);
+    
+    // Metaballs 场函数
+    sum += radius * radius / (dist * dist + 0.001);
   }
   
-  // 阈值判定（形成连续表面）
+  // 阈值
   float threshold = 1.0;
-  float alpha = smoothstep(threshold - 0.2, threshold + 0.2, sum);
+  float alpha = smoothstep(threshold - 0.1, threshold + 0.1, sum);
   
-  // 根据速度着色（简单版本）
-  vec3 finalColor = u_color;
+  // 边缘发光效果
+  float edge = smoothstep(threshold - 0.2, threshold, sum) - alpha;
+  vec3 glowColor = uColor * 1.5;
   
-  gl_FragColor = vec4(finalColor, alpha);
+  vec3 finalColor = mix(glowColor, uColor, alpha);
+  
+  gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
 }

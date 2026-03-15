@@ -1,4 +1,6 @@
-// Metaballs 顶点着色器
+// Metaballs Vertex Shader
+precision highp float;
+
 attribute vec2 position;
 
 void main() {

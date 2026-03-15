@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.11
+ * Version: 0.12
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.10
+ * Version: 0.11
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -148,7 +148,7 @@ function init() {
 
 // 设置控制面板
 function setupControls() {
-  // 粒子数量
+  // 粒子数量 - 立即添加或删除粒子
   const particleCountSlider = document.getElementById('particleCount');
   const particleCountVal = document.getElementById('particleCountVal');
   particleCountSlider.addEventListener('input', (e) => {
@@ -156,30 +156,40 @@ function setupControls() {
     CONFIG.particleCount = val;
     particleCountVal.textContent = val;
     solver.maxParticles = val;
-    // 如果当前粒子太多，删除一些
+    
+    // 如果粒子不够，立即添加
+    while (solver.particles.length < val) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * 0.5;
+      solver.addParticle(
+        (Math.random() - 0.5) * 2 + r * Math.cos(angle),
+        0.5 + r * Math.sin(angle) * 0.3
+      );
+    }
+    // 如果粒子太多，删除
     while (solver.particles.length > val) {
       solver.particles.pop();
     }
   });
   
-  // 重力
+  // 重力 - 直接修改
   const gravitySlider = document.getElementById('gravity');
   const gravityVal = document.getElementById('gravityVal');
   gravitySlider.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     CONFIG.gravity.y = val;
     gravityVal.textContent = val.toFixed(1);
-    solver.gravity.y = val;
+    if (solver) solver.gravity.y = val;
   });
   
-  // 粘度
+  // 粘度 - 直接修改
   const viscositySlider = document.getElementById('viscosity');
   const viscosityVal = document.getElementById('viscosityVal');
   viscositySlider.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     CONFIG.viscosity = val;
     viscosityVal.textContent = val.toFixed(2);
-    solver.viscosity = val;
+    if (solver) solver.viscosity = val;
   });
   
   // 鼠标力

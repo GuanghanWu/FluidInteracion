@@ -122,19 +122,34 @@ function init() {
         // 边缘高光（也受 softness 影响）
         float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
         
-        // 内部深度效果 - 根据场值强度变化
-        float depthRange = 0.2 + uEdgeSoftness * 0.2;
-        float depth = smoothstep(threshold, threshold + depthRange, field);
-        vec3 deepColor = uColor * 0.3;      // 深处暗色
-        vec3 shallowColor = uColor * 1.2;   // 浅处亮色
-        vec3 innerColor = mix(deepColor, shallowColor, depth);
+        // 等高线效果 - 根据场值强度分层
+        // field 范围通常是 0 ~ 2.0+（多个粒子叠加）
+        // 越中心 field 越大，颜色越深
+        float normalizedField = (field - threshold) / (1.5 - threshold); // 归一化到 0~1
+        normalizedField = clamp(normalizedField, 0.0, 1.0);
+        
+        // 多层等高线颜色
+        vec3 centerColor = uColor * 0.2;      // 最中心：深色
+        vec3 midColor1 = uColor * 0.6;        // 中间层1
+        vec3 midColor2 = uColor * 0.9;        // 中间层2
+        vec3 outerColor = uColor * 1.3;       // 边缘附近：亮色
+        
+        // 根据 normalizedField 插值颜色
+        vec3 innerColor;
+        if (normalizedField < 0.33) {
+          innerColor = mix(outerColor, midColor2, normalizedField / 0.33);
+        } else if (normalizedField < 0.66) {
+          innerColor = mix(midColor2, midColor1, (normalizedField - 0.33) / 0.33);
+        } else {
+          innerColor = mix(midColor1, centerColor, (normalizedField - 0.66) / 0.34);
+        }
         
         // 边缘发光
         vec3 edgeColor = uColor * 1.8;
         vec3 finalColor = mix(edgeColor, innerColor, alpha);
         
-        // 整体亮度提升 - 即使静止也有光泽
-        finalColor += uColor * 0.2 * field;
+        // 整体亮度提升
+        finalColor += uColor * 0.1 * field;
         
         gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
       }

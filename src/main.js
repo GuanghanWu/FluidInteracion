@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.20 - 硬边界容器
+ * Version: 0.21 - 玻璃墙边界（能量守恒）
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -348,10 +348,10 @@ function animate() {
   solver.step();
   applyMouseForce();
   
-  // 硬边界 - 容器效果，粒子无法逃逸
+  // 硬边界 - 玻璃墙，完全弹性碰撞（能量守恒）
   const aspect = window.innerWidth / window.innerHeight;
   for (const p of solver.particles) {
-    p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 0.6);
+    p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 1.0); // 完全弹性，能量不损失
   }
   
   // 更新 Metaballs 场

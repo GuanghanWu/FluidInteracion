@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.27 - 折叠面板 + 颜色参数可调
+ * Version: 0.29 - 纹理优化（512分辨率+每2帧更新）
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

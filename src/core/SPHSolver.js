@@ -14,6 +14,9 @@ export class SPHSolver {
     this.gasConstant = options.gasConstant || 0.3;
     this.viscosity = options.viscosity || 0.1;
     this.particles = [];
+    
+    // 边界设置（用于镜像粒子）
+    this.bounds = options.bounds || null; // { minX, minY, maxX, maxY }
   }
   
   addParticle(x, y) {
@@ -43,14 +46,46 @@ export class SPHSolver {
     return (45 / (Math.PI * Math.pow(this.h, 6))) * (this.h - r);
   }
   
+  // 计算镜像粒子对密度的贡献
+  _ghostParticleDensity(pi) {
+    let ghostDensity = 0;
+    const { minX, minY, maxX, maxY } = this.bounds;
+    const h = this.h;
+    
+    // 检查四个边界，生成镜像粒子
+    // 左边界
+    if (pi.x - minX < h) {
+      const dist = pi.x - minX;
+      ghostDensity += this.poly6(2 * dist); // 镜像距离 = 2 * 到边界距离
+    }
+    // 右边界
+    if (maxX - pi.x < h) {
+      const dist = maxX - pi.x;
+      ghostDensity += this.poly6(2 * dist);
+    }
+    // 下边界
+    if (pi.y - minY < h) {
+      const dist = pi.y - minY;
+      ghostDensity += this.poly6(2 * dist);
+    }
+    // 上边界
+    if (maxY - pi.y < h) {
+      const dist = maxY - pi.y;
+      ghostDensity += this.poly6(2 * dist);
+    }
+    
+    return ghostDensity;
+  }
+  
   step() {
     const h2 = this.h * this.h;
     
-    // 1. 计算密度
+    // 1. 计算密度（包含镜像粒子）
     for (let i = 0; i < this.particles.length; i++) {
       const pi = this.particles[i];
       pi.density = 0;
       
+      // 真实粒子贡献
       for (let j = 0; j < this.particles.length; j++) {
         const pj = this.particles[j];
         const dx = pi.x - pj.x;
@@ -60,6 +95,11 @@ export class SPHSolver {
         if (r2 < h2) {
           pi.density += this.poly6(Math.sqrt(r2));
         }
+      }
+      
+      // 镜像粒子贡献（边界补偿）
+      if (this.bounds) {
+        pi.density += this._ghostParticleDensity(pi);
       }
       
       // 压力 = k * (密度 - 静止密度)

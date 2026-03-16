@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.21 - 玻璃墙边界（能量守恒）
+ * Version: 0.22 - 镜像边界（Ghost Particles）
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -55,6 +55,7 @@ function init() {
   document.body.appendChild(renderer.domElement);
   
   // 初始化 SPH - 颜料池效果（无重力）
+  const aspect = window.innerWidth / window.innerHeight;
   solver = new SPHSolver({
     h: 0.35,  // 匹配视觉半径
     maxParticles: CONFIG.particleCount,
@@ -62,7 +63,8 @@ function init() {
     restDensity: 1.0,
     gasConstant: 0.2,
     viscosity: 0.15,
-    dt: 0.005
+    dt: 0.005,
+    bounds: { minX: -aspect * 0.95, minY: -0.95, maxX: aspect * 0.95, maxY: 0.95 }
   });
   
   // 添加初始粒子 - 颜料滴落效果（分散在可视范围内）

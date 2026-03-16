@@ -93,36 +93,11 @@ export class SPHSolver {
   }
   
   step() {
-    const h2 = this.h * this.h;
+    const minDist = this.h * 0.5; // 最小距离，小于此距离产生排斥
+    const repulsionStrength = 2.0; // 排斥力强度
+    const attractionStrength = 0.1; // 吸引力（让粒子保持一定距离）
     
-    // 1. 计算密度（包含镜像粒子）
-    for (let i = 0; i < this.particles.length; i++) {
-      const pi = this.particles[i];
-      pi.density = 0;
-      
-      // 真实粒子贡献
-      for (let j = 0; j < this.particles.length; j++) {
-        const pj = this.particles[j];
-        const dx = pi.x - pj.x;
-        const dy = pi.y - pj.y;
-        const r2 = dx * dx + dy * dy;
-        
-        if (r2 < h2) {
-          pi.density += this.poly6(Math.sqrt(r2));
-        }
-      }
-      
-      // 镜像粒子贡献（边界补偿）
-      if (this.bounds) {
-        // 镜像粒子权重更高，补偿缺失的邻居
-        pi.density += this._ghostParticleDensity(pi) * 2.0;
-      }
-      
-      // 压力 = k * (密度 - 静止密度)
-      pi.pressure = this.gasConstant * Math.max(0, pi.density - this.restDensity);
-    }
-    
-    // 2. 计算力
+    // 计算力 - 简单排斥力模型
     for (let i = 0; i < this.particles.length; i++) {
       const pi = this.particles[i];
       let fx = 0, fy = 0;
@@ -135,17 +110,26 @@ export class SPHSolver {
         const dy = pi.y - pj.y;
         const r = Math.sqrt(dx * dx + dy * dy);
         
-        if (r >= this.h || r < 0.0001) continue;
+        if (r < 0.0001) continue;
         
-        // 压力力（相互排斥）
-        const pressureForce = -this.spikyGrad(r) * (pi.pressure + pj.pressure) / (2 * pj.density);
-        fx += pressureForce * (dx / r);
-        fy += pressureForce * (dy / r);
+        if (r < minDist) {
+          // 太近时排斥
+          const force = (minDist - r) * repulsionStrength;
+          fx += force * (dx / r);
+          fy += force * (dy / r);
+        } else if (r < this.h) {
+          // 中等距离时轻微吸引（保持聚集）
+          const force = -(r - minDist) * attractionStrength;
+          fx += force * (dx / r);
+          fy += force * (dy / r);
+        }
         
         // 粘度力（速度平滑）
-        const viscForce = this.viscosity * this.viscosityLap(r) / pj.density;
-        fx += viscForce * (pj.vx - pi.vx);
-        fy += viscForce * (pj.vy - pi.vy);
+        if (r < this.h) {
+          const viscForce = this.viscosity * 0.1;
+          fx += viscForce * (pj.vx - pi.vx);
+          fy += viscForce * (pj.vy - pi.vy);
+        }
       }
       
       pi.ax = fx + this.gravity.x;

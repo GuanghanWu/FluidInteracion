@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.18 - 扩大粒子大小范围
+ * Version: 0.19 - 限制粒子在可视范围
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -65,12 +65,13 @@ function init() {
     dt: 0.005
   });
   
-  // 添加初始粒子 - 颜料滴落效果（分散在中央）
-  for (let i = 0; i < 150; i++) {
+  // 添加初始粒子 - 颜料滴落效果（分散在可视范围内）
+  for (let i = 0; i < CONFIG.particleCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * 0.5;  // 更集中
-    const x = Math.cos(angle) * r;
-    const y = Math.sin(angle) * r;  // 居中，无偏向
+    const r = Math.sqrt(Math.random()) * 0.8;
+    // 限制在可视范围内
+    const x = Math.cos(angle) * r * 1.5;
+    const y = Math.sin(angle) * r;
     solver.addParticle(x, y);
   }
   
@@ -165,14 +166,14 @@ function setupControls() {
     particleCountVal.textContent = val;
     solver.maxParticles = val;
     
-    // 如果粒子不够，立即添加
+    // 如果粒子不够，立即添加（限制在可视范围内）
     while (solver.particles.length < val) {
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * 0.5;
-      solver.addParticle(
-        (Math.random() - 0.5) * 2 + r * Math.cos(angle),
-        0.5 + r * Math.sin(angle) * 0.3
-      );
+      const r = Math.random() * 0.8;
+      // 限制在 -1.5 ~ 1.5 范围内（可视区域）
+      const x = Math.cos(angle) * r * 1.5;
+      const y = Math.sin(angle) * r;
+      solver.addParticle(x, y);
     }
     // 如果粒子太多，删除
     while (solver.particles.length > val) {
@@ -347,9 +348,10 @@ function animate() {
   solver.step();
   applyMouseForce();
   
-  // 软边界 - 弹簧恢复力
+  // 软边界 - 限制在可视范围内
+  const aspect = window.innerWidth / window.innerHeight;
   for (const p of solver.particles) {
-    p.applySoftBounds(-1.8, -1, 1.8, 1, 80, 0.85);
+    p.applySoftBounds(-aspect * 0.9, -0.9, aspect * 0.9, 0.9, 100, 0.9);
   }
   
   // 更新 Metaballs 场

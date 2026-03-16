@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.16 - 粒子半径调节
+ * Version: 0.17 - 修复粒子椭圆变形
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -227,10 +227,13 @@ function onResize() {
   metaballsMesh.geometry = new THREE.PlaneGeometry(2 * aspect, 2);
 }
 
-// 屏幕坐标转世界坐标（-1 到 1）
+// 屏幕坐标转世界坐标
 function screenToWorld(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
-  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const aspect = window.innerWidth / window.innerHeight;
+  // X: 映射到 [-aspect, aspect]
+  // Y: 映射到 [-1, 1]
+  const x = (((clientX - rect.left) / rect.width) * 2 - 1) * aspect;
   const y = -((clientY - rect.top) / rect.height) * 2 + 1;
   return { x, y };
 }
@@ -286,7 +289,12 @@ function applyMouseForce() {
 // 计算 Metaballs 距离场
 function updateMetaballsField() {
   const size = CONFIG.textureSize;
-  const radius = CONFIG.particleRadius * size * 0.5;
+  const aspect = window.innerWidth / window.innerHeight;
+  
+  // 保持正圆：根据宽高比调整半径计算
+  const radiusX = CONFIG.particleRadius * size * 0.5;
+  const radiusY = radiusX * aspect; // Y方向根据屏幕比例调整
+  const radius = Math.max(radiusX, radiusY);
   
   // 清空
   for (let i = 0; i < pixelData.length; i += 4) {
@@ -298,25 +306,28 @@ function updateMetaballsField() {
   
   // 计算每个粒子的贡献
   for (const p of solver.particles) {
-    // 世界坐标 (-1 to 1) 转纹理坐标 (0 to size)
-    const tx = (p.x + 1) * 0.5 * size;
+    // 世界坐标 (-aspect to aspect, -1 to 1) 转纹理坐标 (0 to size)
+    // X: 从 [-aspect, aspect] 映射到 [0, size]
+    // Y: 从 [-1, 1] 映射到 [0, size]
+    const tx = ((p.x / aspect) + 1) * 0.5 * size;
     const ty = (p.y + 1) * 0.5 * size;
     
     // 只计算影响范围内的像素
-    const minX = Math.max(0, Math.floor(tx - radius));
-    const maxX = Math.min(size, Math.ceil(tx + radius));
-    const minY = Math.max(0, Math.floor(ty - radius));
-    const maxY = Math.min(size, Math.ceil(ty + radius));
+    const minX = Math.max(0, Math.floor(tx - radiusX));
+    const maxX = Math.min(size, Math.ceil(tx + radiusX));
+    const minY = Math.max(0, Math.floor(ty - radiusY));
+    const maxY = Math.min(size, Math.ceil(ty + radiusY));
     
     for (let y = minY; y < maxY; y++) {
       for (let x = minX; x < maxX; x++) {
-        const dx = x - tx;
-        const dy = y - ty;
+        // 归一化距离，保持正圆
+        const dx = (x - tx) / radiusX;
+        const dy = (y - ty) / radiusY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < radius) {
+        if (dist < 1.0) {
           // Metaballs 场函数
-          const field = (1 - dist / radius) * (1 - dist / radius);
+          const field = (1.0 - dist) * (1.0 - dist);
           const idx = (y * size + x) * 4;
           
           // 累加场值（增强基础亮度）

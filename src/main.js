@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.23 - 简化排斥力模型
+ * Version: 0.24 - 边缘过渡参数
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -14,7 +14,8 @@ let CONFIG = {
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
-  textureSize: 256
+  textureSize: 256,
+  edgeSoftness: 0.5  // 边缘过渡比例（0=硬边，1=最软）
 };
 
 let scene, camera, renderer;
@@ -93,7 +94,8 @@ function init() {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTexture: { value: dataTexture },
-      uColor: { value: new THREE.Vector3(0, 0.8, 1.0) }
+      uColor: { value: new THREE.Vector3(0, 0.8, 1.0) },
+      uEdgeSoftness: { value: CONFIG.edgeSoftness }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -105,6 +107,7 @@ function init() {
     fragmentShader: `
       uniform sampler2D uTexture;
       uniform vec3 uColor;
+      uniform float uEdgeSoftness;
       varying vec2 vUv;
       
       void main() {
@@ -112,13 +115,16 @@ function init() {
         
         // 阈值产生流体表面
         float threshold = 0.5;
-        float alpha = smoothstep(threshold - 0.1, threshold + 0.1, field);
+        // 边缘过渡宽度由 edgeSoftness 控制（0.1 ~ 0.5）
+        float edgeWidth = 0.1 + uEdgeSoftness * 0.4;
+        float alpha = smoothstep(threshold - edgeWidth, threshold + edgeWidth, field);
         
-        // 边缘高光
-        float edge = smoothstep(threshold - 0.15, threshold, field) - alpha;
+        // 边缘高光（也受 softness 影响）
+        float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
         
         // 内部深度效果 - 根据场值强度变化
-        float depth = smoothstep(threshold, threshold + 0.3, field);
+        float depthRange = 0.2 + uEdgeSoftness * 0.2;
+        float depth = smoothstep(threshold, threshold + depthRange, field);
         vec3 deepColor = uColor * 0.3;      // 深处暗色
         vec3 shallowColor = uColor * 1.2;   // 浅处亮色
         vec3 innerColor = mix(deepColor, shallowColor, depth);
@@ -215,6 +221,20 @@ function setupControls() {
     CONFIG.mouseForce = val;
     mouseForceVal.textContent = val.toFixed(1);
   });
+  
+  // 边缘过渡（Edge Softness）
+  const edgeSoftnessSlider = document.getElementById('edgeSoftness');
+  const edgeSoftnessVal = document.getElementById('edgeSoftnessVal');
+  edgeSoftnessSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    CONFIG.edgeSoftness = val;
+    edgeSoftnessVal.textContent = val.toFixed(1);
+    // 更新着色器 uniform
+    if (metaballsMesh && metaballsMesh.material.uniforms.uEdgeSoftness) {
+      metaballsMesh.material.uniforms.uEdgeSoftness.value = val;
+    }
+  });
+}
 }
 
 function onResize() {

@@ -19,7 +19,9 @@
       padding: 15px;
       border-radius: 8px;
       border: 1px solid #0ff;
-      min-width: 200px;
+      min-width: 220px;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .control-group {
       margin-bottom: 10px;
@@ -32,6 +34,13 @@
     .control-group input[type="range"] {
       width: 100%;
       cursor: pointer;
+    }
+    .control-group input[type="color"] {
+      width: 100%;
+      height: 30px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
     }
     .stats {
       margin-top: 10px;
@@ -50,10 +59,50 @@
       padding: 5px 10px;
       border-radius: 3px;
     }
+    /* 折叠页样式 */
+    .accordion {
+      margin-bottom: 10px;
+    }
+    .accordion-header {
+      background: rgba(0, 80, 100, 0.5);
+      padding: 8px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-header:hover {
+      background: rgba(0, 100, 120, 0.6);
+    }
+    .accordion-header::after {
+      content: '▼';
+      font-size: 10px;
+    }
+    .accordion-header.collapsed::after {
+      content: '▶';
+    }
+    .accordion-content {
+      padding: 10px;
+      display: block;
+    }
+    .accordion-content.collapsed {
+      display: none;
+    }
+    .color-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .color-row label {
+      flex: 1;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
   <div id="info">
+    <!-- 基础参数 -->
     <div class="control-group">
       <label>Particles: <span id="particleCountVal">300</span></label>
       <input type="range" id="particleCount" min="50" max="800" value="300" step="50">
@@ -62,21 +111,67 @@
       <label>Particle Size: <span id="radiusVal">1.0</span></label>
       <input type="range" id="radiusScale" min="0.3" max="4.0" value="1.0" step="0.1">
     </div>
-    <div class="control-group">
-      <label>Viscosity: <span id="viscosityVal">0.15</span></label>
-      <input type="range" id="viscosity" min="0" max="0.5" value="0.15" step="0.05">
+    
+    <!-- 物理参数折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="physics">Physics</div>
+      <div class="accordion-content collapsed" id="physics">
+        <div class="control-group">
+          <label>Viscosity: <span id="viscosityVal">0.15</span></label>
+          <input type="range" id="viscosity" min="0" max="0.5" value="0.15" step="0.05">
+        </div>
+        <div class="control-group">
+          <label>Mouse Force: <span id="mouseForceVal">2.0</span></label>
+          <input type="range" id="mouseForce" min="0" max="5" value="2" step="0.5">
+        </div>
+      </div>
     </div>
-    <div class="control-group">
-      <label>Mouse Force: <span id="mouseForceVal">2.0</span></label>
-      <input type="range" id="mouseForce" min="0" max="5" value="2" step="0.5">
+    
+    <!-- 视觉效果折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="visual">Visual</div>
+      <div class="accordion-content collapsed" id="visual">
+        <div class="control-group">
+          <label>Edge Softness: <span id="edgeSoftnessVal">0.5</span></label>
+          <input type="range" id="edgeSoftness" min="0.1" max="1.0" value="0.5" step="0.1">
+        </div>
+        <div class="control-group">
+          <label>Color Layers: <span id="colorLayersVal">4</span></label>
+          <input type="range" id="colorLayers" min="2" max="6" value="4" step="1">
+        </div>
+        <div class="control-group">
+          <label>Center Darkness: <span id="centerDarkVal">0.2</span></label>
+          <input type="range" id="centerDark" min="0.05" max="0.5" value="0.2" step="0.05">
+        </div>
+        <div class="control-group">
+          <label>Edge Brightness: <span id="edgeBrightVal">1.5</span></label>
+          <input type="range" id="edgeBright" min="1.0" max="2.0" value="1.5" step="0.1">
+        </div>
+      </div>
     </div>
-    <div class="control-group">
-      <label>Edge Softness: <span id="edgeSoftnessVal">0.5</span></label>
-      <input type="range" id="edgeSoftness" min="0.1" max="1.0" value="0.5" step="0.1">
+    
+    <!-- 颜色折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="colors">Colors</div>
+      <div class="accordion-content collapsed" id="colors">
+        <div class="control-group">
+          <label>Base Color</label>
+          <input type="color" id="baseColor" value="#00ccff">
+        </div>
+        <div class="control-group">
+          <label>Center Color</label>
+          <input type="color" id="centerColor" value="#001133">
+        </div>
+        <div class="control-group">
+          <label>Edge Color</label>
+          <input type="color" id="edgeColor" value="#66ffff">
+        </div>
+      </div>
     </div>
+    
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
   </div>
-  <div id="version">v0.24</div>
+  <div id="version">v0.27</div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

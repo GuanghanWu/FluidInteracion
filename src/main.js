@@ -1,21 +1,27 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.24 - 边缘过渡参数
+ * Version: 0.27 - 折叠面板 + 颜色参数可调
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
 
 // 配置（会被控制面板覆盖）
 let CONFIG = {
-  particleCount: 300,  // 更多粒子，更易融合
-  particleRadius: 0.22,  // 基础半径
-  gravity: { x: 0, y: 0 },  // 无重力 - 颜料池效果
+  particleCount: 300,
+  particleRadius: 0.22,
+  gravity: { x: 0, y: 0 },
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
   textureSize: 256,
-  edgeSoftness: 0.5  // 边缘过渡比例（0=硬边，1=最软）
+  edgeSoftness: 0.5,
+  colorLayers: 4,        // 颜色层数
+  centerDark: 0.2,      // 中心暗度
+  edgeBright: 1.5,      // 边缘亮度
+  baseColor: '#00ccff', // 基础色
+  centerColor: '#001133', // 中心色
+  edgeColor: '#66ffff'   // 边缘色
 };
 
 let scene, camera, renderer;
@@ -95,7 +101,10 @@ function init() {
     uniforms: {
       uTexture: { value: dataTexture },
       uColor: { value: new THREE.Vector3(0, 0.8, 1.0) },
-      uEdgeSoftness: { value: CONFIG.edgeSoftness }
+      uEdgeSoftness: { value: CONFIG.edgeSoftness },
+      uColorLayers: { value: CONFIG.colorLayers },
+      uCenterDark: { value: CONFIG.centerDark },
+      uEdgeBright: { value: CONFIG.edgeBright }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -108,6 +117,9 @@ function init() {
       uniform sampler2D uTexture;
       uniform vec3 uColor;
       uniform float uEdgeSoftness;
+      uniform float uColorLayers;
+      uniform float uCenterDark;
+      uniform float uEdgeBright;
       varying vec2 vUv;
       
       void main() {
@@ -115,53 +127,43 @@ function init() {
         
         // 阈值产生流体表面
         float threshold = 0.5;
-        // 边缘过渡宽度由 edgeSoftness 控制（0.1 ~ 0.5）
         float edgeWidth = 0.1 + uEdgeSoftness * 0.4;
         float alpha = smoothstep(threshold - edgeWidth, threshold + edgeWidth, field);
         
-        // 边缘高光（也受 softness 影响）
+        // 边缘高光
         float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
         
-        // 等高线效果 - 根据场值强度分层
-        // field 范围：单个粒子 ~0.5，多个叠加可到 5.0+
-        // 使用对数压缩，让高值区域也有变化
-        float logField = log(field + 1.0) / log(6.0); // 压缩到 0~1
+        // 等高线效果 - 拉大颜色差异
+        float logField = log(field + 1.0) / log(6.0);
         logField = clamp(logField, 0.0, 1.0);
         
-        // 细粒度等高线 - 更多层次
-        vec3 color0 = uColor * 1.5;   // 最外：很亮
-        vec3 color1 = uColor * 1.2;   // 亮
-        vec3 color2 = uColor * 0.9;   // 中等
-        vec3 color3 = uColor * 0.6;   // 稍暗
-        vec3 color4 = uColor * 0.4;   // 暗
-        vec3 color5 = uColor * 0.2;   // 最中心：深色
+        // 根据层数选择颜色
+        float layers = uColorLayers;
+        float layerIndex = floor(logField * layers);
+        float t = fract(logField * layers);
         
-        // 6层渐变
-        vec3 innerColor;
-        float t;
-        if (logField < 0.2) {
-          t = logField / 0.2;
-          innerColor = mix(color0, color1, t);
-        } else if (logField < 0.4) {
-          t = (logField - 0.2) / 0.2;
-          innerColor = mix(color1, color2, t);
-        } else if (logField < 0.6) {
-          t = (logField - 0.4) / 0.2;
-          innerColor = mix(color2, color3, t);
-        } else if (logField < 0.8) {
-          t = (logField - 0.6) / 0.2;
-          innerColor = mix(color3, color4, t);
+        // 每层颜色：从亮到暗，差异明显
+        vec3 colorA, colorB;
+        
+        if (layerIndex < 1.0) {
+          colorA = uColor * uEdgeBright;      // 最亮
+          colorB = uColor * 1.0;
+        } else if (layerIndex < 2.0) {
+          colorA = uColor * 1.0;
+          colorB = uColor * 0.6;
+        } else if (layerIndex < 3.0) {
+          colorA = uColor * 0.6;
+          colorB = uColor * 0.35;
         } else {
-          t = (logField - 0.8) / 0.2;
-          innerColor = mix(color4, color5, t);
+          colorA = uColor * 0.35;
+          colorB = uColor * uCenterDark;      // 最暗
         }
         
-        // 边缘发光
-        vec3 edgeColor = uColor * 1.8;
-        vec3 finalColor = mix(edgeColor, innerColor, alpha);
+        vec3 innerColor = mix(colorA, colorB, t);
         
-        // 整体亮度提升
-        finalColor += uColor * 0.1 * field;
+        // 边缘发光
+        vec3 edgeColor = uColor * (uEdgeBright + 0.3);
+        vec3 finalColor = mix(edgeColor, innerColor, alpha);
         
         gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
       }
@@ -252,14 +254,59 @@ function setupControls() {
   // 边缘过渡（Edge Softness）
   const edgeSoftnessSlider = document.getElementById('edgeSoftness');
   const edgeSoftnessVal = document.getElementById('edgeSoftnessVal');
-  edgeSoftnessSlider.addEventListener('input', (e) => {
+  edgeSoftnessSlider?.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     CONFIG.edgeSoftness = val;
     edgeSoftnessVal.textContent = val.toFixed(1);
-    // 更新着色器 uniform
-    if (metaballsMesh && metaballsMesh.material.uniforms.uEdgeSoftness) {
+    if (metaballsMesh?.material.uniforms.uEdgeSoftness) {
       metaballsMesh.material.uniforms.uEdgeSoftness.value = val;
     }
+  });
+  
+  // 颜色层数
+  const colorLayersSlider = document.getElementById('colorLayers');
+  const colorLayersVal = document.getElementById('colorLayersVal');
+  colorLayersSlider?.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    CONFIG.colorLayers = val;
+    colorLayersVal.textContent = val;
+    if (metaballsMesh?.material.uniforms.uColorLayers) {
+      metaballsMesh.material.uniforms.uColorLayers.value = val;
+    }
+  });
+  
+  // 中心暗度
+  const centerDarkSlider = document.getElementById('centerDark');
+  const centerDarkVal = document.getElementById('centerDarkVal');
+  centerDarkSlider?.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    CONFIG.centerDark = val;
+    centerDarkVal.textContent = val.toFixed(2);
+    if (metaballsMesh?.material.uniforms.uCenterDark) {
+      metaballsMesh.material.uniforms.uCenterDark.value = val;
+    }
+  });
+  
+  // 边缘亮度
+  const edgeBrightSlider = document.getElementById('edgeBright');
+  const edgeBrightVal = document.getElementById('edgeBrightVal');
+  edgeBrightSlider?.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    CONFIG.edgeBright = val;
+    edgeBrightVal.textContent = val.toFixed(1);
+    if (metaballsMesh?.material.uniforms.uEdgeBright) {
+      metaballsMesh.material.uniforms.uEdgeBright.value = val;
+    }
+  });
+  
+  // 折叠页功能
+  document.querySelectorAll('.accordion-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const target = header.dataset.accordion;
+      const content = document.getElementById(target);
+      header.classList.toggle('collapsed');
+      content?.classList.toggle('collapsed');
+    });
   });
 }
 

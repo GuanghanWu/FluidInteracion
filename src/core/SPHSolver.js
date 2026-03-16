@@ -53,25 +53,40 @@ export class SPHSolver {
     const h = this.h;
     
     // 检查四个边界，生成镜像粒子
-    // 左边界
+    // 镜像粒子距离 = 粒子到边界的距离 + 边界到镜像粒子的距离（相同）
+    // 即：镜像粒子在边界外对称位置，距离 = 2 * 到边界距离
+    
+    // 左边界：镜像粒子在 minX - dist 处，到 pi 的距离 = dist + dist = 2*dist
     if (pi.x - minX < h) {
-      const dist = pi.x - minX;
-      ghostDensity += this.poly6(2 * dist); // 镜像距离 = 2 * 到边界距离
+      const distToBoundary = pi.x - minX;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
     }
     // 右边界
     if (maxX - pi.x < h) {
-      const dist = maxX - pi.x;
-      ghostDensity += this.poly6(2 * dist);
+      const distToBoundary = maxX - pi.x;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
     }
     // 下边界
     if (pi.y - minY < h) {
-      const dist = pi.y - minY;
-      ghostDensity += this.poly6(2 * dist);
+      const distToBoundary = pi.y - minY;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
     }
     // 上边界
     if (maxY - pi.y < h) {
-      const dist = maxY - pi.y;
-      ghostDensity += this.poly6(2 * dist);
+      const distToBoundary = maxY - pi.y;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
     }
     
     return ghostDensity;
@@ -99,7 +114,8 @@ export class SPHSolver {
       
       // 镜像粒子贡献（边界补偿）
       if (this.bounds) {
-        pi.density += this._ghostParticleDensity(pi);
+        // 镜像粒子权重更高，补偿缺失的邻居
+        pi.density += this._ghostParticleDensity(pi) * 2.0;
       }
       
       // 压力 = k * (密度 - 静止密度)

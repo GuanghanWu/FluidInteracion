@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.14 - 颜料池效果（无重力）
+ * Version: 0.15 - 内部光泽修复
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -114,10 +114,18 @@ function init() {
         // 边缘高光
         float edge = smoothstep(threshold - 0.15, threshold, field) - alpha;
         
-        // 内部颜色 + 边缘发光
-        vec3 innerColor = uColor * 0.6;
-        vec3 edgeColor = uColor * 1.5;
+        // 内部深度效果 - 根据场值强度变化
+        float depth = smoothstep(threshold, threshold + 0.3, field);
+        vec3 deepColor = uColor * 0.3;      // 深处暗色
+        vec3 shallowColor = uColor * 1.2;   // 浅处亮色
+        vec3 innerColor = mix(deepColor, shallowColor, depth);
+        
+        // 边缘发光
+        vec3 edgeColor = uColor * 1.8;
         vec3 finalColor = mix(edgeColor, innerColor, alpha);
+        
+        // 整体亮度提升 - 即使静止也有光泽
+        finalColor += uColor * 0.2 * field;
         
         gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
       }
@@ -307,8 +315,8 @@ function updateMetaballsField() {
           const field = (1 - dist / radius) * (1 - dist / radius);
           const idx = (y * size + x) * 4;
           
-          // 累加场值（限制在 0-255）
-          pixelData[idx] = Math.min(255, pixelData[idx] + field * 100);
+          // 累加场值（增强基础亮度）
+          pixelData[idx] = Math.min(255, pixelData[idx] + field * 150);
         }
       }
     }

@@ -87,10 +87,31 @@ export class Particle {
   }
   
   /**
-   * 硬边界 - 保持兼容
-   * @deprecated 使用 applySoftBounds 替代
+   * 硬边界 - 容器效果
+   * 粒子严格限制在边界内，无法逃逸
+   * @param {number} minX 
+   * @param {number} minY 
+   * @param {number} maxX 
+   * @param {number} maxY 
+   * @param {number} damping - 反弹阻尼 (默认 0.7)
    */
-  checkBounds(minX, minY, maxX, maxY, damping = 0.5) {
-    this.applySoftBounds(minX, minY, maxX, maxY, 100, damping);
+  applyHardBounds(minX, minY, maxX, maxY, damping = 0.7) {
+    // X 轴硬边界
+    if (this.x < minX) {
+      this.x = minX;
+      this.vx *= -damping;
+    } else if (this.x > maxX) {
+      this.x = maxX;
+      this.vx *= -damping;
+    }
+    
+    // Y 轴硬边界
+    if (this.y < minY) {
+      this.y = minY;
+      this.vy *= -damping;
+    } else if (this.y > maxY) {
+      this.y = maxY;
+      this.vy *= -damping;
+    }
   }
 }

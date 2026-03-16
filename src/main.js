@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.13
+ * Version: 0.14 - 颜料池效果（无重力）
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -10,7 +10,7 @@ import { SPHSolver } from './core/SPHSolver.js';
 let CONFIG = {
   particleCount: 200,
   particleRadius: 0.22,  // 更厚实
-  gravity: { x: 0, y: -1.5 },
+  gravity: { x: 0, y: 0 },  // 无重力 - 颜料池效果
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
@@ -54,23 +54,23 @@ function init() {
   document.body.style.backgroundColor = '#000000';
   document.body.appendChild(renderer.domElement);
   
-  // 初始化 SPH - 更稳定的参数
+  // 初始化 SPH - 颜料池效果（无重力）
   solver = new SPHSolver({
     h: 0.35,  // 匹配视觉半径
     maxParticles: CONFIG.particleCount,
-    gravity: CONFIG.gravity,
+    gravity: CONFIG.gravity,  // { x: 0, y: 0 }
     restDensity: 1.0,
     gasConstant: 0.2,
     viscosity: 0.15,
     dt: 0.005
   });
   
-  // 添加初始粒子 - 聚集成水滴
+  // 添加初始粒子 - 颜料滴落效果（分散在中央）
   for (let i = 0; i < 100; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * 0.8;
+    const r = Math.sqrt(Math.random()) * 0.5;  // 更集中
     const x = Math.cos(angle) * r;
-    const y = Math.sin(angle) * r * 0.5 + 0.5;
+    const y = Math.sin(angle) * r;  // 居中，无偏向
     solver.addParticle(x, y);
   }
   

@@ -123,25 +123,37 @@ function init() {
         float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
         
         // 等高线效果 - 根据场值强度分层
-        // field 范围通常是 0 ~ 2.0+（多个粒子叠加）
-        // 越中心 field 越大，颜色越深
-        float normalizedField = (field - threshold) / (1.5 - threshold); // 归一化到 0~1
-        normalizedField = clamp(normalizedField, 0.0, 1.0);
+        // field 范围：单个粒子 ~0.5，多个叠加可到 5.0+
+        // 使用对数压缩，让高值区域也有变化
+        float logField = log(field + 1.0) / log(6.0); // 压缩到 0~1
+        logField = clamp(logField, 0.0, 1.0);
         
-        // 多层等高线颜色
-        vec3 centerColor = uColor * 0.2;      // 最中心：深色
-        vec3 midColor1 = uColor * 0.6;        // 中间层1
-        vec3 midColor2 = uColor * 0.9;        // 中间层2
-        vec3 outerColor = uColor * 1.3;       // 边缘附近：亮色
+        // 细粒度等高线 - 更多层次
+        vec3 color0 = uColor * 1.5;   // 最外：很亮
+        vec3 color1 = uColor * 1.2;   // 亮
+        vec3 color2 = uColor * 0.9;   // 中等
+        vec3 color3 = uColor * 0.6;   // 稍暗
+        vec3 color4 = uColor * 0.4;   // 暗
+        vec3 color5 = uColor * 0.2;   // 最中心：深色
         
-        // 根据 normalizedField 插值颜色
+        // 6层渐变
         vec3 innerColor;
-        if (normalizedField < 0.33) {
-          innerColor = mix(outerColor, midColor2, normalizedField / 0.33);
-        } else if (normalizedField < 0.66) {
-          innerColor = mix(midColor2, midColor1, (normalizedField - 0.33) / 0.33);
+        float t;
+        if (logField < 0.2) {
+          t = logField / 0.2;
+          innerColor = mix(color0, color1, t);
+        } else if (logField < 0.4) {
+          t = (logField - 0.2) / 0.2;
+          innerColor = mix(color1, color2, t);
+        } else if (logField < 0.6) {
+          t = (logField - 0.4) / 0.2;
+          innerColor = mix(color2, color3, t);
+        } else if (logField < 0.8) {
+          t = (logField - 0.6) / 0.2;
+          innerColor = mix(color3, color4, t);
         } else {
-          innerColor = mix(midColor1, centerColor, (normalizedField - 0.66) / 0.34);
+          t = (logField - 0.8) / 0.2;
+          innerColor = mix(color4, color5, t);
         }
         
         // 边缘发光

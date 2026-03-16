@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.22 - 镜像边界（Ghost Particles）
+ * Version: 0.23 - 简化排斥力模型
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

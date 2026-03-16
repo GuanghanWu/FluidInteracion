@@ -98,10 +98,29 @@
       flex: 1;
       font-size: 11px;
     }
+    /* 面板折叠 */
+    #panelContent.collapsed {
+      display: none;
+    }
+    #info.collapsed {
+      min-width: auto;
+      padding: 10px 15px;
+    }
+    #panelToggle {
+      transition: transform 0.2s;
+    }
+    #panelToggle.collapsed {
+      transform: rotate(-90deg);
+    }
   </style>
 </head>
 <body>
   <div id="info">
+    <!-- 面板折叠按钮 -->
+    <div id="panelToggle" style="position: absolute; top: 5px; right: 10px; cursor: pointer; font-size: 14px; color: #0ff;">▼</div>
+    
+    <!-- 面板内容 -->
+    <div id="panelContent">
     <!-- 基础参数 -->
     <div class="control-group">
       <label>Particles: <span id="particleCountVal">300</span></label>
@@ -170,6 +189,7 @@
     </div>
     
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
+    </div>
   </div>
   <div id="version">v0.27</div>
   <script type="module" src="/src/main.js"></script>

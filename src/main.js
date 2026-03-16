@@ -308,6 +308,17 @@ function setupControls() {
       content?.classList.toggle('collapsed');
     });
   });
+  
+  // 面板整体折叠
+  const panelToggle = document.getElementById('panelToggle');
+  const panelContent = document.getElementById('panelContent');
+  const infoPanel = document.getElementById('info');
+  
+  panelToggle?.addEventListener('click', () => {
+    panelToggle.classList.toggle('collapsed');
+    panelContent?.classList.toggle('collapsed');
+    infoPanel?.classList.toggle('collapsed');
+  });
 }
 
 function onResize() {

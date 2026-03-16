@@ -14,14 +14,15 @@ let CONFIG = {
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
-  textureSize: 256,
+  textureSize: 512,      // 提升分辨率
+  textureUpdateInterval: 2, // 每2帧更新一次
   edgeSoftness: 0.5,
-  colorLayers: 4,        // 颜色层数
-  centerDark: 0.2,      // 中心暗度
-  edgeBright: 1.5,      // 边缘亮度
-  baseColor: '#00ccff', // 基础色
-  centerColor: '#001133', // 中心色
-  edgeColor: '#66ffff'   // 边缘色
+  colorLayers: 4,
+  centerDark: 0.2,
+  edgeBright: 1.5,
+  baseColor: '#00ccff',
+  centerColor: '#001133',
+  edgeColor: '#66ffff'
 };
 
 let scene, camera, renderer;
@@ -29,6 +30,7 @@ let solver;
 let mouse = { x: 0, y: 0, isDown: false };
 let frameCount = 0;
 let lastTime = performance.now();
+let textureFrameCount = 0; // 纹理更新计数器
 
 // Metaballs 相关
 let metaballsMesh;
@@ -457,11 +459,15 @@ function animate() {
   // 硬边界 - 玻璃墙，完全弹性碰撞（能量守恒）
   const aspect = window.innerWidth / window.innerHeight;
   for (const p of solver.particles) {
-    p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 1.0); // 完全弹性，能量不损失
+    p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 1.0);
   }
   
-  // 更新 Metaballs 场
-  updateMetaballsField();
+  // 更新 Metaballs 场（每 N 帧更新一次）
+  textureFrameCount++;
+  if (textureFrameCount >= CONFIG.textureUpdateInterval) {
+    textureFrameCount = 0;
+    updateMetaballsField();
+  }
   
   // 渲染
   renderer.render(scene, camera);

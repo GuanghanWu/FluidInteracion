@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.12
+ * Version: 0.13
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -9,7 +9,7 @@ import { SPHSolver } from './core/SPHSolver.js';
 // 配置（会被控制面板覆盖）
 let CONFIG = {
   particleCount: 200,
-  particleRadius: 0.15,
+  particleRadius: 0.22,  // 更厚实
   gravity: { x: 0, y: -1.5 },
   viscosity: 0.15,
   mouseForce: 2.0,
@@ -56,7 +56,7 @@ function init() {
   
   // 初始化 SPH - 更稳定的参数
   solver = new SPHSolver({
-    h: 0.25,
+    h: 0.35,  // 匹配视觉半径
     maxParticles: CONFIG.particleCount,
     gravity: CONFIG.gravity,
     restDensity: 1.0,
@@ -324,9 +324,9 @@ function animate() {
   solver.step();
   applyMouseForce();
   
-  // 边界
+  // 软边界 - 弹簧恢复力
   for (const p of solver.particles) {
-    p.checkBounds(-1.8, -1, 1.8, 1, 0.4);
+    p.applySoftBounds(-1.8, -1, 1.8, 1, 80, 0.85);
   }
   
   // 更新 Metaballs 场

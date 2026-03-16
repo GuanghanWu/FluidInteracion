@@ -51,28 +51,46 @@ export class Particle {
   }
   
   /**
-   * 边界碰撞检测
+   * 软边界 - 弹簧恢复力
+   * 粒子越界时产生恢复力，而非硬碰撞
    * @param {number} minX 
    * @param {number} minY 
    * @param {number} maxX 
    * @param {number} maxY 
-   * @param {number} damping - 反弹阻尼系数
+   * @param {number} stiffness - 弹簧刚度 (默认 50)
+   * @param {number} damping - 速度阻尼 (默认 0.9)
    */
-  checkBounds(minX, minY, maxX, maxY, damping = 0.5) {
-    if (this.x < minX) {
-      this.x = minX;
-      this.vx *= -damping;
-    } else if (this.x > maxX) {
-      this.x = maxX;
-      this.vx *= -damping;
+  applySoftBounds(minX, minY, maxX, maxY, stiffness = 50, damping = 0.9) {
+    const boundaryMargin = 0.1; // 边界缓冲区
+    
+    // X 轴边界
+    if (this.x < minX + boundaryMargin) {
+      const penetration = (minX + boundaryMargin) - this.x;
+      this.ax += stiffness * penetration; // 恢复力
+      this.vx *= damping; // 速度阻尼
+    } else if (this.x > maxX - boundaryMargin) {
+      const penetration = this.x - (maxX - boundaryMargin);
+      this.ax -= stiffness * penetration;
+      this.vx *= damping;
     }
     
-    if (this.y < minY) {
-      this.y = minY;
-      this.vy *= -damping;
-    } else if (this.y > maxY) {
-      this.y = maxY;
-      this.vy *= -damping;
+    // Y 轴边界
+    if (this.y < minY + boundaryMargin) {
+      const penetration = (minY + boundaryMargin) - this.y;
+      this.ay += stiffness * penetration;
+      this.vy *= damping;
+    } else if (this.y > maxY - boundaryMargin) {
+      const penetration = this.y - (maxY - boundaryMargin);
+      this.ay -= stiffness * penetration;
+      this.vy *= damping;
     }
+  }
+  
+  /**
+   * 硬边界 - 保持兼容
+   * @deprecated 使用 applySoftBounds 替代
+   */
+  checkBounds(minX, minY, maxX, maxY, damping = 0.5) {
+    this.applySoftBounds(minX, minY, maxX, maxY, 100, damping);
   }
 }

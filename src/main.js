@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.15 - 内部光泽修复
+ * Version: 0.16 - 粒子半径调节
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -180,14 +180,18 @@ function setupControls() {
     }
   });
   
-  // 重力 - 直接修改
-  const gravitySlider = document.getElementById('gravity');
-  const gravityVal = document.getElementById('gravityVal');
-  gravitySlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.gravity.y = val;
-    gravityVal.textContent = val.toFixed(1);
-    if (solver) solver.gravity.y = val;
+  // 粒子半径比例 - 同时影响视觉和物理
+  const radiusSlider = document.getElementById('radiusScale');
+  const radiusVal = document.getElementById('radiusVal');
+  radiusSlider.addEventListener('input', (e) => {
+    const scale = parseFloat(e.target.value);
+    radiusVal.textContent = scale.toFixed(1);
+    
+    // 更新视觉半径
+    CONFIG.particleRadius = 0.22 * scale;
+    
+    // 更新物理核函数半径
+    if (solver) solver.h = 0.35 * scale;
   });
   
   // 粘度 - 直接修改

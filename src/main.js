@@ -235,7 +235,6 @@ function setupControls() {
     }
   });
 }
-}
 
 function onResize() {
   const aspect = window.innerWidth / window.innerHeight;

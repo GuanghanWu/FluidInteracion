@@ -55,7 +55,7 @@ function init() {
   document.body.appendChild(renderer.domElement);
   
   // 初始化 SPH - 颜料池效果（无重力）
-  const aspect = window.innerWidth / window.innerHeight;
+  // aspect 已经在上面定义过了
   solver = new SPHSolver({
     h: 0.35,  // 匹配视觉半径
     maxParticles: CONFIG.particleCount,

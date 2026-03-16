@@ -1,15 +1,15 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.17 - 修复粒子椭圆变形
+ * Version: 0.18 - 扩大粒子大小范围
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
 
 // 配置（会被控制面板覆盖）
 let CONFIG = {
-  particleCount: 200,
-  particleRadius: 0.22,  // 更厚实
+  particleCount: 300,  // 更多粒子，更易融合
+  particleRadius: 0.22,  // 基础半径
   gravity: { x: 0, y: 0 },  // 无重力 - 颜料池效果
   viscosity: 0.15,
   mouseForce: 2.0,
@@ -66,7 +66,7 @@ function init() {
   });
   
   // 添加初始粒子 - 颜料滴落效果（分散在中央）
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 150; i++) {
     const angle = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * 0.5;  // 更集中
     const x = Math.cos(angle) * r;

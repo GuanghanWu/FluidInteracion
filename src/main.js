@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - Metaballs Texture Version
  * SPH + CPU Distance Field + Shader
- * Version: 0.29 - 纹理优化（512分辨率+每2帧更新）
+ * Version: 0.30 - 2048纹理+三色渐变修复
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -14,7 +14,7 @@ let CONFIG = {
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
-  textureSize: 512,      // 提升分辨率
+  textureSize: 2048,      // 高分辨率纹理
   textureUpdateInterval: 2, // 每2帧更新一次
   edgeSoftness: 0.5,
   colorLayers: 4,
@@ -102,7 +102,9 @@ function init() {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTexture: { value: dataTexture },
-      uColor: { value: new THREE.Vector3(0, 0.8, 1.0) },
+      uBaseColor: { value: new THREE.Color(CONFIG.baseColor) },
+      uCenterColor: { value: new THREE.Color(CONFIG.centerColor) },
+      uEdgeColor: { value: new THREE.Color(CONFIG.edgeColor) },
       uEdgeSoftness: { value: CONFIG.edgeSoftness },
       uColorLayers: { value: CONFIG.colorLayers },
       uCenterDark: { value: CONFIG.centerDark },
@@ -117,7 +119,9 @@ function init() {
     `,
     fragmentShader: `
       uniform sampler2D uTexture;
-      uniform vec3 uColor;
+      uniform vec3 uBaseColor;
+      uniform vec3 uCenterColor;
+      uniform vec3 uEdgeColor;
       uniform float uEdgeSoftness;
       uniform float uColorLayers;
       uniform float uCenterDark;
@@ -144,28 +148,28 @@ function init() {
         float layerIndex = floor(logField * layers);
         float t = fract(logField * layers);
         
-        // 每层颜色：从亮到暗，差异明显
+        // 每层颜色：从边缘色到中心色渐变
         vec3 colorA, colorB;
         
         if (layerIndex < 1.0) {
-          colorA = uColor * uEdgeBright;      // 最亮
-          colorB = uColor * 1.0;
+          colorA = uEdgeColor * uEdgeBright;      // 最亮边缘
+          colorB = uBaseColor;
         } else if (layerIndex < 2.0) {
-          colorA = uColor * 1.0;
-          colorB = uColor * 0.6;
+          colorA = uBaseColor;
+          colorB = uBaseColor * 0.7;
         } else if (layerIndex < 3.0) {
-          colorA = uColor * 0.6;
-          colorB = uColor * 0.35;
+          colorA = uBaseColor * 0.7;
+          colorB = uCenterColor * 0.5;
         } else {
-          colorA = uColor * 0.35;
-          colorB = uColor * uCenterDark;      // 最暗
+          colorA = uCenterColor * 0.5;
+          colorB = uCenterColor * uCenterDark;    // 最暗中心
         }
         
         vec3 innerColor = mix(colorA, colorB, t);
         
         // 边缘发光
-        vec3 edgeColor = uColor * (uEdgeBright + 0.3);
-        vec3 finalColor = mix(edgeColor, innerColor, alpha);
+        vec3 edgeGlow = uEdgeColor * (uEdgeBright + 0.3);
+        vec3 finalColor = mix(edgeGlow, innerColor, alpha);
         
         gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
       }
@@ -298,6 +302,33 @@ function setupControls() {
     edgeBrightVal.textContent = val.toFixed(1);
     if (metaballsMesh?.material.uniforms.uEdgeBright) {
       metaballsMesh.material.uniforms.uEdgeBright.value = val;
+    }
+  });
+  
+  // 基础颜色
+  const baseColorPicker = document.getElementById('baseColor');
+  baseColorPicker?.addEventListener('input', (e) => {
+    CONFIG.baseColor = e.target.value;
+    if (metaballsMesh?.material.uniforms.uBaseColor) {
+      metaballsMesh.material.uniforms.uBaseColor.value.set(e.target.value);
+    }
+  });
+  
+  // 中心颜色
+  const centerColorPicker = document.getElementById('centerColor');
+  centerColorPicker?.addEventListener('input', (e) => {
+    CONFIG.centerColor = e.target.value;
+    if (metaballsMesh?.material.uniforms.uCenterColor) {
+      metaballsMesh.material.uniforms.uCenterColor.value.set(e.target.value);
+    }
+  });
+  
+  // 边缘颜色
+  const edgeColorPicker = document.getElementById('edgeColor');
+  edgeColorPicker?.addEventListener('input', (e) => {
+    CONFIG.edgeColor = e.target.value;
+    if (metaballsMesh?.material.uniforms.uEdgeColor) {
+      metaballsMesh.material.uniforms.uEdgeColor.value.set(e.target.value);
     }
   });
   

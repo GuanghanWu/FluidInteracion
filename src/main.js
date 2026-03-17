@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.32 - GPU距离场优化
+ * Version: 0.33 - Profile折叠页+FPS限制
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -21,7 +21,8 @@ let CONFIG = {
   edgeBright: 1.5,
   baseColor: '#00ccff',
   centerColor: '#001133',
-  edgeColor: '#66ffff'
+  edgeColor: '#66ffff',
+  fpsLimit: 120
 };
 
 let scene, camera, renderer;
@@ -317,6 +318,12 @@ function setupControls() {
     }
   });
   
+  // FPS 限制
+  document.getElementById('fpsLimit')?.addEventListener('change', (e) => {
+    CONFIG.fpsLimit = parseInt(e.target.value);
+    document.getElementById('fpsLimitVal').textContent = CONFIG.fpsLimit;
+  });
+  
   // 折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
@@ -401,8 +408,19 @@ function applyMouseForce() {
   }
 }
 
+let lastFrameTime = performance.now();
+
 function animate() {
   requestAnimationFrame(animate);
+  
+  // FPS 限制
+  const now = performance.now();
+  const delta = now - lastFrameTime;
+  const frameInterval = 1000 / CONFIG.fpsLimit;
+  
+  if (delta < frameInterval) return;
+  
+  lastFrameTime = now - (delta % frameInterval);
   
   // 物理更新
   solver.step();
@@ -426,9 +444,8 @@ function animate() {
   renderer.setRenderTarget(null);
   renderer.render(scene, camera);
   
-  // FPS
+  // FPS 统计
   frameCount++;
-  const now = performance.now();
   if (now - lastTime >= 1000) {
     document.getElementById('fps').textContent = frameCount;
     document.getElementById('count').textContent = solver.particles.length;

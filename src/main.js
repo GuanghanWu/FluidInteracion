@@ -77,12 +77,26 @@ function init() {
   particleCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
   particleCamera.position.z = 1;
   
-  // 粒子材质 - 简单的圆形渐变
+  // 粒子材质 - 圆形渐变纹理（metaball 效果关键）
   const particleGeo = new THREE.PlaneGeometry(1, 1);
+  
+  // 创建径向渐变纹理
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  const particleTexture = new THREE.CanvasTexture(canvas);
+  
   particleMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+    map: particleTexture,
     transparent: true,
-    opacity: 0.3,
+    opacity: 1.0,
     blending: THREE.AdditiveBlending,
     depthTest: false,
     depthWrite: false

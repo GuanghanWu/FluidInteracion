@@ -30,6 +30,7 @@ let solver;
 let mouse = { x: 0, y: 0, isDown: false };
 let frameCount = 0;
 let lastTime = performance.now();
+let lastFrameTime = performance.now();
 
 // GPU Metaballs
 let metaballsMesh;
@@ -407,8 +408,6 @@ function applyMouseForce() {
     }
   }
 }
-
-let lastFrameTime = performance.now();
 
 function animate() {
   requestAnimationFrame(animate);

@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.34 - 密度控制+粒子大小优化
+ * Version: 0.36 - HSV颜色选择器+版本号规范
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

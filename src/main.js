@@ -1,12 +1,12 @@
 /**
- * Fluid Simulation MVP - Metaballs Texture Version
- * SPH + CPU Distance Field + Shader
- * Version: 0.30 - 2048纹理+三色渐变修复
+ * Fluid Simulation MVP - GPU Metaballs Version
+ * SPH + GPU Distance Field + Shader
+ * Version: 0.32 - GPU距离场优化
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
 
-// 配置（会被控制面板覆盖）
+// 配置
 let CONFIG = {
   particleCount: 300,
   particleRadius: 0.22,
@@ -14,8 +14,7 @@ let CONFIG = {
   viscosity: 0.15,
   mouseForce: 2.0,
   mouseRadius: 1.0,
-  textureSize: 2048,      // 高分辨率纹理
-  textureUpdateInterval: 2, // 每2帧更新一次
+  textureSize: 512,
   edgeSoftness: 0.5,
   colorLayers: 4,
   centerDark: 0.2,
@@ -30,12 +29,15 @@ let solver;
 let mouse = { x: 0, y: 0, isDown: false };
 let frameCount = 0;
 let lastTime = performance.now();
-let textureFrameCount = 0; // 纹理更新计数器
 
-// Metaballs 相关
+// GPU Metaballs
 let metaballsMesh;
-let dataTexture;
-let pixelData;
+let metaballsRT;
+let particleMesh;
+let particleScene, particleCamera;
+let particleMaterial;
+
+const PARTICLE_QUAD_SIZE = 0.15;
 
 try {
   init();
@@ -50,25 +52,52 @@ function init() {
     throw new Error('浏览器不支持 WebGL');
   }
   
-  scene = new THREE.Scene();
-  
   const aspect = window.innerWidth / window.innerHeight;
-  camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
-  camera.position.z = 1;
   
   renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(1); // 降低像素比提高性能
+  renderer.setPixelRatio(1);
   renderer.setClearColor(0x000000, 1);
   document.body.style.backgroundColor = '#000000';
   document.body.appendChild(renderer.domElement);
   
-  // 初始化 SPH - 颜料池效果（无重力）
-  // aspect 已经在上面定义过了
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
+  camera.position.z = 1;
+  
+  // GPU RenderTarget
+  metaballsRT = new THREE.WebGLRenderTarget(CONFIG.textureSize, CONFIG.textureSize, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat
+  });
+  
+  // 粒子离屏场景
+  particleScene = new THREE.Scene();
+  particleCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
+  particleCamera.position.z = 1;
+  
+  // 粒子材质 - 简单的圆形渐变
+  const particleGeo = new THREE.PlaneGeometry(1, 1);
+  particleMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.3,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    depthWrite: false
+  });
+  
+  // InstancedMesh 用于批量渲染粒子
+  particleMesh = new THREE.InstancedMesh(particleGeo, particleMaterial, 1000);
+  particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  particleScene.add(particleMesh);
+  
+  // SPH
   solver = new SPHSolver({
-    h: 0.35,  // 匹配视觉半径
+    h: 0.35,
     maxParticles: CONFIG.particleCount,
-    gravity: CONFIG.gravity,  // { x: 0, y: 0 }
+    gravity: CONFIG.gravity,
     restDensity: 1.0,
     gasConstant: 0.2,
     viscosity: 0.15,
@@ -76,32 +105,21 @@ function init() {
     bounds: { minX: -aspect * 0.95, minY: -0.95, maxX: aspect * 0.95, maxY: 0.95 }
   });
   
-  // 添加初始粒子 - 颜料滴落效果（分散在可视范围内）
   for (let i = 0; i < CONFIG.particleCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * 0.8;
-    // 限制在可视范围内
     const x = Math.cos(angle) * r * 1.5;
     const y = Math.sin(angle) * r;
     solver.addParticle(x, y);
   }
   
-  // 创建数据纹理
-  pixelData = new Uint8Array(CONFIG.textureSize * CONFIG.textureSize * 4);
-  dataTexture = new THREE.DataTexture(
-    pixelData,
-    CONFIG.textureSize,
-    CONFIG.textureSize,
-    THREE.RGBAFormat
-  );
-  dataTexture.needsUpdate = true;
+  updateParticleInstances();
   
-  // 创建全屏平面 + Shader
-  const geometry = new THREE.PlaneGeometry(2 * aspect, 2);
-  
-  const material = new THREE.ShaderMaterial({
+  // 主场景 - 使用渲染目标作为纹理
+  const planeGeo = new THREE.PlaneGeometry(2 * aspect, 2);
+  const planeMat = new THREE.ShaderMaterial({
     uniforms: {
-      uTexture: { value: dataTexture },
+      uTexture: { value: metaballsRT.texture },
       uBaseColor: { value: new THREE.Color(CONFIG.baseColor) },
       uCenterColor: { value: new THREE.Color(CONFIG.centerColor) },
       uEdgeColor: { value: new THREE.Color(CONFIG.edgeColor) },
@@ -131,28 +149,22 @@ function init() {
       void main() {
         float field = texture2D(uTexture, vUv).r;
         
-        // 阈值产生流体表面
-        float threshold = 0.5;
-        float edgeWidth = 0.1 + uEdgeSoftness * 0.4;
+        float threshold = 0.15;
+        float edgeWidth = 0.05 + uEdgeSoftness * 0.15;
         float alpha = smoothstep(threshold - edgeWidth, threshold + edgeWidth, field);
-        
-        // 边缘高光
         float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
         
-        // 等高线效果 - 拉大颜色差异
-        float logField = log(field + 1.0) / log(6.0);
+        float logField = log(field * 2.0 + 1.0) / log(2.5);
         logField = clamp(logField, 0.0, 1.0);
         
-        // 根据层数选择颜色
         float layers = uColorLayers;
         float layerIndex = floor(logField * layers);
         float t = fract(logField * layers);
         
-        // 每层颜色：从边缘色到中心色渐变
         vec3 colorA, colorB;
         
         if (layerIndex < 1.0) {
-          colorA = uEdgeColor * uEdgeBright;      // 最亮边缘
+          colorA = uEdgeColor * uEdgeBright;
           colorB = uBaseColor;
         } else if (layerIndex < 2.0) {
           colorA = uBaseColor;
@@ -162,12 +174,10 @@ function init() {
           colorB = uCenterColor * 0.5;
         } else {
           colorA = uCenterColor * 0.5;
-          colorB = uCenterColor * uCenterDark;    // 最暗中心
+          colorB = uCenterColor * uCenterDark;
         }
         
         vec3 innerColor = mix(colorA, colorB, t);
-        
-        // 边缘发光
         vec3 edgeGlow = uEdgeColor * (uEdgeBright + 0.3);
         vec3 finalColor = mix(edgeGlow, innerColor, alpha);
         
@@ -178,15 +188,10 @@ function init() {
     blending: THREE.AdditiveBlending
   });
   
-  metaballsMesh = new THREE.Mesh(geometry, material);
+  metaballsMesh = new THREE.Mesh(planeGeo, planeMat);
   scene.add(metaballsMesh);
   
-  scene.add(metaballsMesh);
-  
-  // 控制面板事件
   setupControls();
-  
-  // 鼠标/触摸事件
   window.addEventListener('resize', onResize);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
   renderer.domElement.addEventListener('mousedown', () => mouse.isDown = true);
@@ -195,144 +200,110 @@ function init() {
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
   renderer.domElement.addEventListener('touchend', () => mouse.isDown = false);
   
-  console.log('Metaballs Fluid v0.09 initialized');
+  console.log('GPU Metaballs Fluid v0.32 initialized');
 }
 
-// 设置控制面板
+function updateParticleInstances() {
+  const dummy = new THREE.Object3D();
+  const scale = CONFIG.particleRadius * 2.5;
+  
+  for (let i = 0; i < solver.particles.length; i++) {
+    const p = solver.particles[i];
+    dummy.position.set(p.x, p.y, 0);
+    dummy.scale.set(scale, scale, 1);
+    dummy.updateMatrix();
+    particleMesh.setMatrixAt(i, dummy.matrix);
+  }
+  particleMesh.instanceMatrix.needsUpdate = true;
+  particleMesh.count = solver.particles.length;
+}
+
 function setupControls() {
-  // 粒子数量 - 立即添加或删除粒子
-  const particleCountSlider = document.getElementById('particleCount');
-  const particleCountVal = document.getElementById('particleCountVal');
-  particleCountSlider.addEventListener('input', (e) => {
+  document.getElementById('particleCount')?.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
     CONFIG.particleCount = val;
-    particleCountVal.textContent = val;
+    document.getElementById('particleCountVal').textContent = val;
     solver.maxParticles = val;
-    
-    // 如果粒子不够，立即添加（限制在可视范围内）
     while (solver.particles.length < val) {
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * 0.8;
-      // 限制在 -1.5 ~ 1.5 范围内（可视区域）
-      const x = Math.cos(angle) * r * 1.5;
-      const y = Math.sin(angle) * r;
-      solver.addParticle(x, y);
+      solver.addParticle(Math.cos(angle) * r * 1.5, Math.sin(angle) * r);
     }
-    // 如果粒子太多，删除
-    while (solver.particles.length > val) {
-      solver.particles.pop();
-    }
+    while (solver.particles.length > val) solver.particles.pop();
   });
   
-  // 粒子半径比例 - 同时影响视觉和物理
-  const radiusSlider = document.getElementById('radiusScale');
-  const radiusVal = document.getElementById('radiusVal');
-  radiusSlider.addEventListener('input', (e) => {
+  document.getElementById('radiusScale')?.addEventListener('input', (e) => {
     const scale = parseFloat(e.target.value);
-    radiusVal.textContent = scale.toFixed(1);
-    
-    // 更新视觉半径
+    document.getElementById('radiusVal').textContent = scale.toFixed(1);
     CONFIG.particleRadius = 0.22 * scale;
-    
-    // 更新物理核函数半径
     if (solver) solver.h = 0.35 * scale;
   });
   
-  // 粘度 - 直接修改
-  const viscositySlider = document.getElementById('viscosity');
-  const viscosityVal = document.getElementById('viscosityVal');
-  viscositySlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.viscosity = val;
-    viscosityVal.textContent = val.toFixed(2);
-    if (solver) solver.viscosity = val;
+  document.getElementById('viscosity')?.addEventListener('input', (e) => {
+    CONFIG.viscosity = parseFloat(e.target.value);
+    document.getElementById('viscosityVal').textContent = CONFIG.viscosity.toFixed(2);
+    if (solver) solver.viscosity = CONFIG.viscosity;
   });
   
-  // 鼠标力
-  const mouseForceSlider = document.getElementById('mouseForce');
-  const mouseForceVal = document.getElementById('mouseForceVal');
-  mouseForceSlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.mouseForce = val;
-    mouseForceVal.textContent = val.toFixed(1);
+  document.getElementById('mouseForce')?.addEventListener('input', (e) => {
+    CONFIG.mouseForce = parseFloat(e.target.value);
+    document.getElementById('mouseForceVal').textContent = CONFIG.mouseForce.toFixed(1);
   });
   
-  // 边缘过渡（Edge Softness）
-  const edgeSoftnessSlider = document.getElementById('edgeSoftness');
-  const edgeSoftnessVal = document.getElementById('edgeSoftnessVal');
-  edgeSoftnessSlider?.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.edgeSoftness = val;
-    edgeSoftnessVal.textContent = val.toFixed(1);
+  document.getElementById('edgeSoftness')?.addEventListener('input', (e) => {
+    CONFIG.edgeSoftness = parseFloat(e.target.value);
+    document.getElementById('edgeSoftnessVal').textContent = CONFIG.edgeSoftness.toFixed(1);
     if (metaballsMesh?.material.uniforms.uEdgeSoftness) {
-      metaballsMesh.material.uniforms.uEdgeSoftness.value = val;
+      metaballsMesh.material.uniforms.uEdgeSoftness.value = CONFIG.edgeSoftness;
     }
   });
   
-  // 颜色层数
-  const colorLayersSlider = document.getElementById('colorLayers');
-  const colorLayersVal = document.getElementById('colorLayersVal');
-  colorLayersSlider?.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    CONFIG.colorLayers = val;
-    colorLayersVal.textContent = val;
+  document.getElementById('colorLayers')?.addEventListener('input', (e) => {
+    CONFIG.colorLayers = parseInt(e.target.value);
+    document.getElementById('colorLayersVal').textContent = CONFIG.colorLayers;
     if (metaballsMesh?.material.uniforms.uColorLayers) {
-      metaballsMesh.material.uniforms.uColorLayers.value = val;
+      metaballsMesh.material.uniforms.uColorLayers.value = CONFIG.colorLayers;
     }
   });
   
-  // 中心暗度
-  const centerDarkSlider = document.getElementById('centerDark');
-  const centerDarkVal = document.getElementById('centerDarkVal');
-  centerDarkSlider?.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.centerDark = val;
-    centerDarkVal.textContent = val.toFixed(2);
+  document.getElementById('centerDark')?.addEventListener('input', (e) => {
+    CONFIG.centerDark = parseFloat(e.target.value);
+    document.getElementById('centerDarkVal').textContent = CONFIG.centerDark.toFixed(2);
     if (metaballsMesh?.material.uniforms.uCenterDark) {
-      metaballsMesh.material.uniforms.uCenterDark.value = val;
+      metaballsMesh.material.uniforms.uCenterDark.value = CONFIG.centerDark;
     }
   });
   
-  // 边缘亮度
-  const edgeBrightSlider = document.getElementById('edgeBright');
-  const edgeBrightVal = document.getElementById('edgeBrightVal');
-  edgeBrightSlider?.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    CONFIG.edgeBright = val;
-    edgeBrightVal.textContent = val.toFixed(1);
+  document.getElementById('edgeBright')?.addEventListener('input', (e) => {
+    CONFIG.edgeBright = parseFloat(e.target.value);
+    document.getElementById('edgeBrightVal').textContent = CONFIG.edgeBright.toFixed(1);
     if (metaballsMesh?.material.uniforms.uEdgeBright) {
-      metaballsMesh.material.uniforms.uEdgeBright.value = val;
+      metaballsMesh.material.uniforms.uEdgeBright.value = CONFIG.edgeBright;
     }
   });
   
-  // 基础颜色
-  const baseColorPicker = document.getElementById('baseColor');
-  baseColorPicker?.addEventListener('input', (e) => {
+  document.getElementById('baseColor')?.addEventListener('input', (e) => {
     CONFIG.baseColor = e.target.value;
     if (metaballsMesh?.material.uniforms.uBaseColor) {
       metaballsMesh.material.uniforms.uBaseColor.value.set(e.target.value);
     }
   });
   
-  // 中心颜色
-  const centerColorPicker = document.getElementById('centerColor');
-  centerColorPicker?.addEventListener('input', (e) => {
+  document.getElementById('centerColor')?.addEventListener('input', (e) => {
     CONFIG.centerColor = e.target.value;
     if (metaballsMesh?.material.uniforms.uCenterColor) {
       metaballsMesh.material.uniforms.uCenterColor.value.set(e.target.value);
     }
   });
   
-  // 边缘颜色
-  const edgeColorPicker = document.getElementById('edgeColor');
-  edgeColorPicker?.addEventListener('input', (e) => {
+  document.getElementById('edgeColor')?.addEventListener('input', (e) => {
     CONFIG.edgeColor = e.target.value;
     if (metaballsMesh?.material.uniforms.uEdgeColor) {
       metaballsMesh.material.uniforms.uEdgeColor.value.set(e.target.value);
     }
   });
   
-  // 折叠页功能
+  // 折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
       const target = header.dataset.accordion;
@@ -342,37 +313,29 @@ function setupControls() {
     });
   });
   
-  // 面板整体折叠
-  const panelToggle = document.getElementById('panelToggle');
-  const panelContent = document.getElementById('panelContent');
-  const infoPanel = document.getElementById('info');
-  
-  panelToggle?.addEventListener('click', () => {
-    panelToggle.classList.toggle('collapsed');
-    panelContent?.classList.toggle('collapsed');
-    infoPanel?.classList.toggle('collapsed');
+  document.getElementById('panelToggle')?.addEventListener('click', () => {
+    document.getElementById('panelToggle').classList.toggle('collapsed');
+    document.getElementById('panelContent')?.classList.toggle('collapsed');
+    document.getElementById('info')?.classList.toggle('collapsed');
   });
 }
 
 function onResize() {
   const aspect = window.innerWidth / window.innerHeight;
   renderer.setSize(window.innerWidth, window.innerHeight);
-  
   camera.left = -aspect;
   camera.right = aspect;
   camera.updateProjectionMatrix();
-  
-  // 更新平面大小
+  particleCamera.left = -aspect;
+  particleCamera.right = aspect;
+  particleCamera.updateProjectionMatrix();
   metaballsMesh.geometry.dispose();
   metaballsMesh.geometry = new THREE.PlaneGeometry(2 * aspect, 2);
 }
 
-// 屏幕坐标转世界坐标
 function screenToWorld(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
   const aspect = window.innerWidth / window.innerHeight;
-  // X: 映射到 [-aspect, aspect]
-  // Y: 映射到 [-1, 1]
   const x = (((clientX - rect.left) / rect.width) * 2 - 1) * aspect;
   const y = -((clientY - rect.top) / rect.height) * 2 + 1;
   return { x, y };
@@ -404,7 +367,6 @@ function onTouchMove(e) {
 function applyMouseForce() {
   if (!mouse.isDown) return;
   
-  // 添加新粒子
   if (solver.particles.length < CONFIG.particleCount && Math.random() < 0.2) {
     solver.addParticle(
       mouse.x + (Math.random() - 0.5) * 0.2,
@@ -412,7 +374,6 @@ function applyMouseForce() {
     );
   }
   
-  // 吸引粒子
   for (const p of solver.particles) {
     const dx = mouse.x - p.x;
     const dy = mouse.y - p.y;
@@ -426,60 +387,6 @@ function applyMouseForce() {
   }
 }
 
-// 计算 Metaballs 距离场
-function updateMetaballsField() {
-  const size = CONFIG.textureSize;
-  const aspect = window.innerWidth / window.innerHeight;
-  
-  // 保持正圆：根据宽高比调整半径计算
-  const radiusX = CONFIG.particleRadius * size * 0.5;
-  const radiusY = radiusX * aspect; // Y方向根据屏幕比例调整
-  const radius = Math.max(radiusX, radiusY);
-  
-  // 清空
-  for (let i = 0; i < pixelData.length; i += 4) {
-    pixelData[i] = 0;     // R
-    pixelData[i + 1] = 0; // G
-    pixelData[i + 2] = 0; // B
-    pixelData[i + 3] = 255; // A
-  }
-  
-  // 计算每个粒子的贡献
-  for (const p of solver.particles) {
-    // 世界坐标 (-aspect to aspect, -1 to 1) 转纹理坐标 (0 to size)
-    // X: 从 [-aspect, aspect] 映射到 [0, size]
-    // Y: 从 [-1, 1] 映射到 [0, size]
-    const tx = ((p.x / aspect) + 1) * 0.5 * size;
-    const ty = (p.y + 1) * 0.5 * size;
-    
-    // 只计算影响范围内的像素
-    const minX = Math.max(0, Math.floor(tx - radiusX));
-    const maxX = Math.min(size, Math.ceil(tx + radiusX));
-    const minY = Math.max(0, Math.floor(ty - radiusY));
-    const maxY = Math.min(size, Math.ceil(ty + radiusY));
-    
-    for (let y = minY; y < maxY; y++) {
-      for (let x = minX; x < maxX; x++) {
-        // 归一化距离，保持正圆
-        const dx = (x - tx) / radiusX;
-        const dy = (y - ty) / radiusY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < 1.0) {
-          // Metaballs 场函数
-          const field = (1.0 - dist) * (1.0 - dist);
-          const idx = (y * size + x) * 4;
-          
-          // 累加场值（增强基础亮度）
-          pixelData[idx] = Math.min(255, pixelData[idx] + field * 150);
-        }
-      }
-    }
-  }
-  
-  dataTexture.needsUpdate = true;
-}
-
 function animate() {
   requestAnimationFrame(animate);
   
@@ -487,20 +394,22 @@ function animate() {
   solver.step();
   applyMouseForce();
   
-  // 硬边界 - 玻璃墙，完全弹性碰撞（能量守恒）
+  // 边界
   const aspect = window.innerWidth / window.innerHeight;
   for (const p of solver.particles) {
     p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 1.0);
   }
   
-  // 更新 Metaballs 场（每 N 帧更新一次）
-  textureFrameCount++;
-  if (textureFrameCount >= CONFIG.textureUpdateInterval) {
-    textureFrameCount = 0;
-    updateMetaballsField();
-  }
+  // 更新粒子位置到 GPU
+  updateParticleInstances();
   
-  // 渲染
+  // 渲染 metaballs 到纹理（GPU）
+  renderer.setRenderTarget(metaballsRT);
+  renderer.clear();
+  renderer.render(particleScene, particleCamera);
+  
+  // 渲染主场景
+  renderer.setRenderTarget(null);
   renderer.render(scene, camera);
   
   // FPS

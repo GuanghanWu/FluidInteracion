@@ -153,6 +153,96 @@
       flex: 1;
       height: 14px;
     }
+    /* 二级折叠页 - 更简洁 */
+    .sub-accordion {
+      margin: 6px 0;
+      border-left: 2px solid rgba(0, 255, 255, 0.3);
+      padding-left: 8px;
+    }
+    .sub-header {
+      font-size: 11px;
+      color: #0ff;
+      cursor: pointer;
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.8;
+    }
+    .sub-header:hover {
+      opacity: 1;
+    }
+    .sub-header::after {
+      content: '▼';
+      font-size: 8px;
+    }
+    .sub-header.collapsed::after {
+      content: '▶';
+    }
+    .sub-content {
+      display: block;
+      padding: 4px 0 4px 8px;
+    }
+    .sub-content.collapsed {
+      display: none;
+    }
+    .sub-control {
+      margin-bottom: 6px;
+    }
+    .sub-control label {
+      font-size: 10px;
+      color: #aaa;
+      margin-bottom: 2px;
+      display: block;
+    }
+    .sub-control input[type="range"] {
+      width: 100%;
+      height: 12px;
+    }
+    .sub-control select {
+      width: 100%;
+      padding: 3px 6px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #0ff;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 3px;
+      font-size: 10px;
+    }
+    /* 颜色网格 */
+    .color-grid {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+    }
+    .color-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-dot:hover {
+      transform: scale(1.1);
+      border-color: #0ff;
+    }
+    .color-dot.active {
+      border-color: #0ff;
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+    .color-dot.hidden {
+      display: none;
+    }
+    .hsv-panel {
+      display: none;
+      padding: 6px;
+      background: rgba(0, 30, 40, 0.8);
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+    .hsv-panel.show {
+      display: block;
+    }
     /* 面板折叠 */
     #panelContent.collapsed {
       display: none;
@@ -201,61 +291,68 @@
       </div>
     </div>
     
-    <!-- 视觉效果折叠页 -->
+    <!-- Visual 主折叠页 -->
     <div class="accordion">
       <div class="accordion-header collapsed" data-accordion="visual">Visual</div>
       <div class="accordion-content collapsed" id="visual">
-        <div class="control-group">
-          <label>Edge Softness: <span id="edgeSoftnessVal">0.5</span></label>
-          <input type="range" id="edgeSoftness" min="0.1" max="1.0" value="0.5" step="0.1">
-        </div>
-      </div>
-    </div>
-    
-    <!-- 颜色折叠页 -->
-    <div class="accordion">
-      <div class="accordion-header collapsed" data-accordion="colors">Colors</div>
-      <div class="accordion-content collapsed" id="colors">
-        <div class="control-group">
-          <label>Color Layers: <span id="colorLayersVal">3</span></label>
-          <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">
-        </div>
-        <div class="control-group color-item" id="color1Item">
-          <label>Color 1 (Edge)</label>
-          <div class="color-bar" id="color1Bar" style="background: #66ffff;"></div>
-          <div class="hsv-popup" id="color1Popup">
-            <div class="hsv-row"><span>H</span><input type="range" id="color1H" min="0" max="360" value="180"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="color1S" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="color1V" min="0" max="100" value="100"></div>
+        
+        <!-- Colors 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="colors">Colors</div>
+          <div class="sub-content collapsed" id="colors">
+            <div class="sub-control">
+              <label>Layers: <span id="colorLayersVal">3</span></label>
+              <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">
+            </div>
+            <div class="color-grid">
+              <div class="color-dot" id="color1Dot" style="background: #66ffff;" title="Color 1 (Edge)"></div>
+              <div class="color-dot" id="color2Dot" style="background: #00ccff;" title="Color 2"></div>
+              <div class="color-dot" id="color3Dot" style="background: #0088cc;" title="Color 3"></div>
+              <div class="color-dot" id="color4Dot" style="background: #001133;" title="Color 4 (Center)"></div>
+            </div>
+            <div class="hsv-panel" id="hsvPanel">
+              <div class="hsv-row"><span>H</span><input type="range" id="activeColorH" min="0" max="360"></div>
+              <div class="hsv-row"><span>S</span><input type="range" id="activeColorS" min="0" max="100"></div>
+              <div class="hsv-row"><span>V</span><input type="range" id="activeColorV" min="0" max="100"></div>
+            </div>
           </div>
         </div>
-        <div class="control-group color-item" id="color2Item">
-          <label>Color 2</label>
-          <div class="color-bar" id="color2Bar" style="background: #00ccff;"></div>
-          <div class="hsv-popup" id="color2Popup">
-            <div class="hsv-row"><span>H</span><input type="range" id="color2H" min="0" max="360" value="195"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="color2S" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="color2V" min="0" max="100" value="100"></div>
+        
+        <!-- Random 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="random">Random</div>
+          <div class="sub-content collapsed" id="random">
+            <div class="sub-control">
+              <label>Algorithm</label>
+              <select id="randomAlgo">
+                <option value="none">None</option>
+                <option value="perlin">Perlin Noise</option>
+                <option value="simplex">Simplex Noise</option>
+                <option value="white">White Noise</option>
+              </select>
+            </div>
+            <div class="sub-control">
+              <label>Scale: <span id="randomScaleVal">1.0</span></label>
+              <input type="range" id="randomScale" min="0.1" max="3.0" value="1.0" step="0.1">
+            </div>
+            <div class="sub-control">
+              <label>Intensity: <span id="randomIntensityVal">0.3</span></label>
+              <input type="range" id="randomIntensity" min="0" max="1.0" value="0.3" step="0.05">
+            </div>
           </div>
         </div>
-        <div class="control-group color-item" id="color3Item">
-          <label>Color 3</label>
-          <div class="color-bar" id="color3Bar" style="background: #0088cc;"></div>
-          <div class="hsv-popup" id="color3Popup">
-            <div class="hsv-row"><span>H</span><input type="range" id="color3H" min="0" max="360" value="200"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="color3S" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="color3V" min="0" max="100" value="80"></div>
+        
+        <!-- Edge 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="edge">Edge</div>
+          <div class="sub-content collapsed" id="edge">
+            <div class="sub-control">
+              <label>Softness: <span id="edgeSoftnessVal">0.5</span></label>
+              <input type="range" id="edgeSoftness" min="0" max="1.0" value="0.5" step="0.05">
+            </div>
           </div>
         </div>
-        <div class="control-group color-item" id="color4Item">
-          <label>Color 4 (Center)</label>
-          <div class="color-bar" id="color4Bar" style="background: #001133;"></div>
-          <div class="hsv-popup" id="color4Popup">
-            <div class="hsv-row"><span>H</span><input type="range" id="color4H" min="0" max="360" value="210"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="color4S" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="color4V" min="0" max="100" value="20"></div>
-          </div>
-        </div>
+        
       </div>
     </div>
     
@@ -277,7 +374,7 @@
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
     </div>
   </div>
-  <div id="version">v0.37-fix</div>
+  <div id="version">v0.38</div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

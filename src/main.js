@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.37-fix - 修复颜色层数逻辑
+ * Version: 0.38 - Visual重构：二级折叠页+新颜色选择器+Random噪声
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -22,6 +22,10 @@ let CONFIG = {
   color2: '#00ccff',
   color3: '#0088cc',
   color4: '#001133',
+  activeColorIndex: 1,
+  randomAlgo: 'none',
+  randomScale: 1.0,
+  randomIntensity: 0.3,
   fpsLimit: 120
 };
 
@@ -164,10 +168,12 @@ function init() {
       void main() {
         float field = texture2D(uTexture, vUv).r;
         
+        // 固定阈值，EdgeSoftness 只影响层间过渡
         float threshold = 0.15;
-        float edgeWidth = 0.05 + uEdgeSoftness * 0.15;
-        float alpha = smoothstep(threshold - edgeWidth, threshold + edgeWidth, field);
-        float edge = smoothstep(threshold - edgeWidth * 1.5, threshold, field) - alpha;
+        float alpha = smoothstep(threshold - 0.05, threshold + 0.05, field);
+        
+        // 边缘发光效果
+        float edgeGlowAlpha = smoothstep(threshold - 0.1, threshold, field) - alpha;
         
         float logField = log(field * 2.0 + 1.0) / log(2.5);
         logField = clamp(logField, 0.0, 1.0);
@@ -176,15 +182,17 @@ function init() {
         float layerIndex = floor(logField * layers);
         float t = fract(logField * layers);
         
+        // EdgeSoftness 模糊层间过渡
+        float softness = 0.5 + uEdgeSoftness * 0.5;
+        t = smoothstep(0.5 - softness * 0.5, 0.5 + softness * 0.5, t);
+        
         vec3 colorA, colorB;
         
-        // 根据层数选择对应的颜色，不混入未启用的颜色
+        // 根据层数选择对应的颜色
         if (layers < 2.0) {
-          // 1 layer: 纯色 color1
           colorA = uColor1;
           colorB = uColor1;
         } else if (layers < 3.0) {
-          // 2 layers: color1 -> color2
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;
@@ -193,7 +201,6 @@ function init() {
             colorB = uColor2;
           }
         } else if (layers < 4.0) {
-          // 3 layers: color1 -> color2 -> color3
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;
@@ -205,7 +212,6 @@ function init() {
             colorB = uColor3;
           }
         } else {
-          // 4 layers: color1 -> color2 -> color3 -> color4
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;
@@ -217,7 +223,7 @@ function init() {
             colorB = uColor4;
           } else {
             colorA = uColor4;
-            colorB = uColor4 * 0.5;
+            colorB = uColor4;
           }
         }
         
@@ -225,7 +231,7 @@ function init() {
         vec3 edgeGlow = uColor1 * 1.3;
         vec3 finalColor = mix(edgeGlow, innerColor, alpha);
         
-        gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
+        gl_FragColor = vec4(finalColor, alpha + edgeGlowAlpha * 0.5);
       }
     `,
     transparent: true,
@@ -377,18 +383,80 @@ function setupControls() {
     v?.addEventListener('input', update);
   }
   
-  setupHSVColor(1, 'uColor1');
-  setupHSVColor(2, 'uColor2');
-  setupHSVColor(3, 'uColor3');
-  setupHSVColor(4, 'uColor4');
+  // 新颜色选择器：点击圆点选择颜色
+  const colorDots = [1, 2, 3, 4].map(i => document.getElementById('color' + i + 'Dot'));
+  const hsvPanel = document.getElementById('hsvPanel');
+  const hInput = document.getElementById('activeColorH');
+  const sInput = document.getElementById('activeColorS');
+  const vInput = document.getElementById('activeColorV');
+  
+  function hexToHsv(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0, s = max === 0 ? 0 : d / max, v = max;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d + 6) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
+  }
+  
+  function updateActiveColor() {
+    if (!CONFIG.activeColorIndex) return;
+    const hex = hsvToHex(parseInt(hInput.value), parseInt(sInput.value), parseInt(vInput.value));
+    CONFIG['color' + CONFIG.activeColorIndex] = hex;
+    const dot = document.getElementById('color' + CONFIG.activeColorIndex + 'Dot');
+    if (dot) dot.style.background = hex;
+    const uniformName = 'uColor' + CONFIG.activeColorIndex;
+    if (metaballsMesh?.material.uniforms[uniformName]) {
+      metaballsMesh.material.uniforms[uniformName].value.set(hex);
+    }
+  }
+  
+  colorDots.forEach((dot, i) => {
+    if (!dot) return;
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      colorDots.forEach(d => d?.classList.remove('active'));
+      dot.classList.add('active');
+      CONFIG.activeColorIndex = i + 1;
+      const hsv = hexToHsv(CONFIG['color' + (i + 1)]);
+      hInput.value = hsv.h;
+      sInput.value = hsv.s;
+      vInput.value = hsv.v;
+      hsvPanel?.classList.add('show');
+    });
+  });
+  
+  hInput?.addEventListener('input', updateActiveColor);
+  sInput?.addEventListener('input', updateActiveColor);
+  vInput?.addEventListener('input', updateActiveColor);
   
   // 初始化颜色层数显示
   updateColorLayers();
   
   // 点击其他地方关闭 HSV 面板
   document.addEventListener('click', () => {
-    document.querySelectorAll('.hsv-popup.show').forEach(p => p.classList.remove('show'));
-    document.querySelectorAll('.color-bar.active').forEach(b => b.classList.remove('active'));
+    hsvPanel?.classList.remove('show');
+    colorDots.forEach(d => d?.classList.remove('active'));
+  });
+  
+  // Random 控制
+  document.getElementById('randomAlgo')?.addEventListener('change', (e) => {
+    CONFIG.randomAlgo = e.target.value;
+  });
+  document.getElementById('randomScale')?.addEventListener('input', (e) => {
+    CONFIG.randomScale = parseFloat(e.target.value);
+    document.getElementById('randomScaleVal').textContent = CONFIG.randomScale.toFixed(1);
+  });
+  document.getElementById('randomIntensity')?.addEventListener('input', (e) => {
+    CONFIG.randomIntensity = parseFloat(e.target.value);
+    document.getElementById('randomIntensityVal').textContent = CONFIG.randomIntensity.toFixed(2);
   });
   
   // FPS 限制
@@ -397,10 +465,21 @@ function setupControls() {
     document.getElementById('fpsLimitVal').textContent = CONFIG.fpsLimit;
   });
   
-  // 折叠面板
+  // 主折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
       const target = header.dataset.accordion;
+      const content = document.getElementById(target);
+      header.classList.toggle('collapsed');
+      content?.classList.toggle('collapsed');
+    });
+  });
+  
+  // 二级折叠面板
+  document.querySelectorAll('.sub-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = header.dataset.sub;
       const content = document.getElementById(target);
       header.classList.toggle('collapsed');
       content?.classList.toggle('collapsed');

@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.37 - Colors重构：4色+层数控制
+ * Version: 0.37-fix - 修复颜色层数逻辑
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -178,21 +178,22 @@ function init() {
         
         vec3 colorA, colorB;
         
+        // 根据层数选择对应的颜色，不混入未启用的颜色
         if (layers < 2.0) {
-          // 1 layer: color1 to color4
+          // 1 layer: 纯色 color1
           colorA = uColor1;
-          colorB = uColor4;
+          colorB = uColor1;
         } else if (layers < 3.0) {
-          // 2 layers
+          // 2 layers: color1 -> color2
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;
           } else {
             colorA = uColor2;
-            colorB = uColor4;
+            colorB = uColor2;
           }
         } else if (layers < 4.0) {
-          // 3 layers
+          // 3 layers: color1 -> color2 -> color3
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;
@@ -201,10 +202,10 @@ function init() {
             colorB = uColor3;
           } else {
             colorA = uColor3;
-            colorB = uColor4;
+            colorB = uColor3;
           }
         } else {
-          // 4 layers
+          // 4 layers: color1 -> color2 -> color3 -> color4
           if (layerIndex < 1.0) {
             colorA = uColor1;
             colorB = uColor2;

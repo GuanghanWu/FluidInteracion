@@ -235,10 +235,16 @@
     }
     .hsv-panel {
       display: none;
-      padding: 6px;
-      background: rgba(0, 30, 40, 0.8);
+      position: absolute;
+      left: 100%;
+      top: 0;
+      margin-left: 8px;
+      padding: 8px;
+      background: rgba(0, 30, 40, 0.95);
       border-radius: 4px;
-      margin-top: 4px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      width: 140px;
+      z-index: 100;
     }
     .hsv-panel.show {
       display: block;
@@ -299,7 +305,7 @@
         <!-- Colors 二级折叠页 -->
         <div class="sub-accordion">
           <div class="sub-header collapsed" data-sub="colors">Colors</div>
-          <div class="sub-content collapsed" id="colors">
+          <div class="sub-content collapsed" id="colors" style="position: relative;">
             <div class="sub-control">
               <label>Layers: <span id="colorLayersVal">3</span></label>
               <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">

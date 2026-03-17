@@ -8,7 +8,8 @@ import { SPHSolver } from './core/SPHSolver.js';
 
 // 配置
 let CONFIG = {
-  particleCount: 300,
+  density: 1.0,
+  baseParticleCount: 300,
   particleRadius: 0.08,
   gravity: { x: 0, y: 0 },
   viscosity: 0.15,
@@ -110,9 +111,10 @@ function init() {
   particleScene.add(particleMesh);
   
   // SPH
+  const initialCount = Math.round(CONFIG.baseParticleCount * CONFIG.density);
   solver = new SPHSolver({
     h: 0.35,
-    maxParticles: CONFIG.particleCount,
+    maxParticles: initialCount,
     gravity: CONFIG.gravity,
     restDensity: 1.0,
     gasConstant: 0.2,
@@ -121,7 +123,7 @@ function init() {
     bounds: { minX: -aspect * 0.95, minY: -0.95, maxX: aspect * 0.95, maxY: 0.95 }
   });
   
-  for (let i = 0; i < CONFIG.particleCount; i++) {
+  for (let i = 0; i < initialCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * 0.8;
     const x = Math.cos(angle) * r * 1.5;
@@ -235,17 +237,18 @@ function updateParticleInstances() {
 }
 
 function setupControls() {
-  document.getElementById('particleCount')?.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    CONFIG.particleCount = val;
-    document.getElementById('particleCountVal').textContent = val;
-    solver.maxParticles = val;
-    while (solver.particles.length < val) {
+  document.getElementById('density')?.addEventListener('input', (e) => {
+    const density = parseFloat(e.target.value);
+    CONFIG.density = density;
+    document.getElementById('densityVal').textContent = density.toFixed(1) + 'x';
+    const newCount = Math.round(CONFIG.baseParticleCount * density);
+    solver.maxParticles = newCount;
+    while (solver.particles.length < newCount) {
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * 0.8;
       solver.addParticle(Math.cos(angle) * r * 1.5, Math.sin(angle) * r);
     }
-    while (solver.particles.length > val) solver.particles.pop();
+    while (solver.particles.length > newCount) solver.particles.pop();
   });
   
   document.getElementById('radiusScale')?.addEventListener('input', (e) => {

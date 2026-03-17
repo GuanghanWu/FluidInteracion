@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.38 - Visual重构：二级折叠页+新颜色选择器+Random噪声
+ * Version: 0.39 - Random噪声算法实现(Perlin/Simplex/White)
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -253,13 +253,59 @@ function init() {
   console.log('GPU Metaballs Fluid v0.32 initialized');
 }
 
+// 噪声函数
+function noise(x, y, seed = 0) {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function perlinNoise(x, y, scale = 1) {
+  const X = Math.floor(x * scale);
+  const Y = Math.floor(y * scale);
+  const fx = (x * scale) - X;
+  const fy = (y * scale) - Y;
+  
+  const n00 = noise(X, Y);
+  const n10 = noise(X + 1, Y);
+  const n01 = noise(X, Y + 1);
+  const n11 = noise(X + 1, Y + 1);
+  
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fy * fy * (3 - 2 * fy);
+  
+  return (1 - u) * (1 - v) * n00 + u * (1 - v) * n10 + (1 - u) * v * n01 + u * v * n11;
+}
+
+function simplexNoise(x, y, scale = 1) {
+  // 简化的 Simplex 噪声，用 Perlin 近似
+  return perlinNoise(x, y, scale);
+}
+
+function getNoiseValue(x, y, algo, scale) {
+  switch (algo) {
+    case 'perlin': return perlinNoise(x, y, scale);
+    case 'simplex': return simplexNoise(x, y, scale);
+    case 'white': return noise(x * scale, y * scale);
+    default: return 0.5;
+  }
+}
+
 function updateParticleInstances() {
   const dummy = new THREE.Object3D();
-  const scale = CONFIG.particleRadius * 0.8;
+  const baseScale = CONFIG.particleRadius * 0.8;
   
   for (let i = 0; i < solver.particles.length; i++) {
     const p = solver.particles[i];
     dummy.position.set(p.x, p.y, 0);
+    
+    // 应用噪声随机化大小
+    let scale = baseScale;
+    if (CONFIG.randomAlgo !== 'none') {
+      const n = getNoiseValue(p.x, p.y, CONFIG.randomAlgo, CONFIG.randomScale);
+      const variation = (n - 0.5) * 2 * CONFIG.randomIntensity;
+      scale = baseScale * (1 + variation);
+    }
+    
     dummy.scale.set(scale, scale, 1);
     dummy.updateMatrix();
     particleMesh.setMatrixAt(i, dummy.matrix);

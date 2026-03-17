@@ -209,18 +209,6 @@
           <label>Edge Softness: <span id="edgeSoftnessVal">0.5</span></label>
           <input type="range" id="edgeSoftness" min="0.1" max="1.0" value="0.5" step="0.1">
         </div>
-        <div class="control-group">
-          <label>Color Layers: <span id="colorLayersVal">4</span></label>
-          <input type="range" id="colorLayers" min="2" max="6" value="4" step="1">
-        </div>
-        <div class="control-group">
-          <label>Center Darkness: <span id="centerDarkVal">0.2</span></label>
-          <input type="range" id="centerDark" min="0.05" max="0.5" value="0.2" step="0.05">
-        </div>
-        <div class="control-group">
-          <label>Edge Brightness: <span id="edgeBrightVal">1.5</span></label>
-          <input type="range" id="edgeBright" min="1.0" max="2.0" value="1.5" step="0.1">
-        </div>
       </div>
     </div>
     
@@ -228,31 +216,44 @@
     <div class="accordion">
       <div class="accordion-header collapsed" data-accordion="colors">Colors</div>
       <div class="accordion-content collapsed" id="colors">
-        <div class="control-group color-item">
-          <label>Base Color</label>
-          <div class="color-bar" id="baseColorBar" style="background: #00ccff;"></div>
-          <div class="hsv-popup" id="baseColorPopup">
-            <div class="hsv-row"><span>H</span><input type="range" id="baseColorH" min="0" max="360" value="195"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="baseColorS" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="baseColorV" min="0" max="100" value="100"></div>
+        <div class="control-group">
+          <label>Color Layers: <span id="colorLayersVal">3</span></label>
+          <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">
+        </div>
+        <div class="control-group color-item" id="color1Item">
+          <label>Color 1 (Edge)</label>
+          <div class="color-bar" id="color1Bar" style="background: #66ffff;"></div>
+          <div class="hsv-popup" id="color1Popup">
+            <div class="hsv-row"><span>H</span><input type="range" id="color1H" min="0" max="360" value="180"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="color1S" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="color1V" min="0" max="100" value="100"></div>
           </div>
         </div>
-        <div class="control-group color-item">
-          <label>Center Color</label>
-          <div class="color-bar" id="centerColorBar" style="background: #001133;"></div>
-          <div class="hsv-popup" id="centerColorPopup">
-            <div class="hsv-row"><span>H</span><input type="range" id="centerColorH" min="0" max="360" value="210"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="centerColorS" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="centerColorV" min="0" max="100" value="20"></div>
+        <div class="control-group color-item" id="color2Item">
+          <label>Color 2</label>
+          <div class="color-bar" id="color2Bar" style="background: #00ccff;"></div>
+          <div class="hsv-popup" id="color2Popup">
+            <div class="hsv-row"><span>H</span><input type="range" id="color2H" min="0" max="360" value="195"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="color2S" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="color2V" min="0" max="100" value="100"></div>
           </div>
         </div>
-        <div class="control-group color-item">
-          <label>Edge Color</label>
-          <div class="color-bar" id="edgeColorBar" style="background: #66ffff;"></div>
-          <div class="hsv-popup" id="edgeColorPopup">
-            <div class="hsv-row"><span>H</span><input type="range" id="edgeColorH" min="0" max="360" value="180"></div>
-            <div class="hsv-row"><span>S</span><input type="range" id="edgeColorS" min="0" max="100" value="100"></div>
-            <div class="hsv-row"><span>V</span><input type="range" id="edgeColorV" min="0" max="100" value="100"></div>
+        <div class="control-group color-item" id="color3Item">
+          <label>Color 3</label>
+          <div class="color-bar" id="color3Bar" style="background: #0088cc;"></div>
+          <div class="hsv-popup" id="color3Popup">
+            <div class="hsv-row"><span>H</span><input type="range" id="color3H" min="0" max="360" value="200"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="color3S" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="color3V" min="0" max="100" value="80"></div>
+          </div>
+        </div>
+        <div class="control-group color-item" id="color4Item">
+          <label>Color 4 (Center)</label>
+          <div class="color-bar" id="color4Bar" style="background: #001133;"></div>
+          <div class="hsv-popup" id="color4Popup">
+            <div class="hsv-row"><span>H</span><input type="range" id="color4H" min="0" max="360" value="210"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="color4S" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="color4V" min="0" max="100" value="20"></div>
           </div>
         </div>
       </div>
@@ -276,7 +277,7 @@
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
     </div>
   </div>
-  <div id="version">v0.36</div>
+  <div id="version">v0.37</div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

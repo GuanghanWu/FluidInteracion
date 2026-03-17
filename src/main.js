@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.36 - HSV颜色选择器+版本号规范
+ * Version: 0.37 - Colors重构：4色+层数控制
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -17,12 +17,11 @@ let CONFIG = {
   mouseRadius: 1.0,
   textureSize: 512,
   edgeSoftness: 0.5,
-  colorLayers: 4,
-  centerDark: 0.2,
-  edgeBright: 1.5,
-  baseColor: '#00ccff',
-  centerColor: '#001133',
-  edgeColor: '#66ffff',
+  colorLayers: 3,
+  color1: '#66ffff',
+  color2: '#00ccff',
+  color3: '#0088cc',
+  color4: '#001133',
   fpsLimit: 120
 };
 
@@ -138,13 +137,12 @@ function init() {
   const planeMat = new THREE.ShaderMaterial({
     uniforms: {
       uTexture: { value: metaballsRT.texture },
-      uBaseColor: { value: new THREE.Color(CONFIG.baseColor) },
-      uCenterColor: { value: new THREE.Color(CONFIG.centerColor) },
-      uEdgeColor: { value: new THREE.Color(CONFIG.edgeColor) },
+      uColor1: { value: new THREE.Color(CONFIG.color1) },
+      uColor2: { value: new THREE.Color(CONFIG.color2) },
+      uColor3: { value: new THREE.Color(CONFIG.color3) },
+      uColor4: { value: new THREE.Color(CONFIG.color4) },
       uEdgeSoftness: { value: CONFIG.edgeSoftness },
-      uColorLayers: { value: CONFIG.colorLayers },
-      uCenterDark: { value: CONFIG.centerDark },
-      uEdgeBright: { value: CONFIG.edgeBright }
+      uColorLayers: { value: CONFIG.colorLayers }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -155,13 +153,12 @@ function init() {
     `,
     fragmentShader: `
       uniform sampler2D uTexture;
-      uniform vec3 uBaseColor;
-      uniform vec3 uCenterColor;
-      uniform vec3 uEdgeColor;
+      uniform vec3 uColor1;
+      uniform vec3 uColor2;
+      uniform vec3 uColor3;
+      uniform vec3 uColor4;
       uniform float uEdgeSoftness;
       uniform float uColorLayers;
-      uniform float uCenterDark;
-      uniform float uEdgeBright;
       varying vec2 vUv;
       
       void main() {
@@ -181,22 +178,50 @@ function init() {
         
         vec3 colorA, colorB;
         
-        if (layerIndex < 1.0) {
-          colorA = uEdgeColor * uEdgeBright;
-          colorB = uBaseColor;
-        } else if (layerIndex < 2.0) {
-          colorA = uBaseColor;
-          colorB = uBaseColor * 0.7;
-        } else if (layerIndex < 3.0) {
-          colorA = uBaseColor * 0.7;
-          colorB = uCenterColor * 0.5;
+        if (layers < 2.0) {
+          // 1 layer: color1 to color4
+          colorA = uColor1;
+          colorB = uColor4;
+        } else if (layers < 3.0) {
+          // 2 layers
+          if (layerIndex < 1.0) {
+            colorA = uColor1;
+            colorB = uColor2;
+          } else {
+            colorA = uColor2;
+            colorB = uColor4;
+          }
+        } else if (layers < 4.0) {
+          // 3 layers
+          if (layerIndex < 1.0) {
+            colorA = uColor1;
+            colorB = uColor2;
+          } else if (layerIndex < 2.0) {
+            colorA = uColor2;
+            colorB = uColor3;
+          } else {
+            colorA = uColor3;
+            colorB = uColor4;
+          }
         } else {
-          colorA = uCenterColor * 0.5;
-          colorB = uCenterColor * uCenterDark;
+          // 4 layers
+          if (layerIndex < 1.0) {
+            colorA = uColor1;
+            colorB = uColor2;
+          } else if (layerIndex < 2.0) {
+            colorA = uColor2;
+            colorB = uColor3;
+          } else if (layerIndex < 3.0) {
+            colorA = uColor3;
+            colorB = uColor4;
+          } else {
+            colorA = uColor4;
+            colorB = uColor4 * 0.5;
+          }
         }
         
         vec3 innerColor = mix(colorA, colorB, t);
-        vec3 edgeGlow = uEdgeColor * (uEdgeBright + 0.3);
+        vec3 edgeGlow = uColor1 * 1.3;
         vec3 finalColor = mix(edgeGlow, innerColor, alpha);
         
         gl_FragColor = vec4(finalColor, alpha + edge * 0.5);
@@ -277,28 +302,26 @@ function setupControls() {
     }
   });
   
+  // Color Layers - 控制显示的颜色数量和shader中的层数
+  function updateColorLayers() {
+    const layers = CONFIG.colorLayers;
+    // 显示/隐藏颜色项
+    for (let i = 1; i <= 4; i++) {
+      const item = document.getElementById('color' + i + 'Item');
+      if (item) {
+        item.style.display = i <= layers ? 'block' : 'none';
+      }
+    }
+    // 更新shader
+    if (metaballsMesh?.material.uniforms.uColorLayers) {
+      metaballsMesh.material.uniforms.uColorLayers.value = layers;
+    }
+  }
+  
   document.getElementById('colorLayers')?.addEventListener('input', (e) => {
     CONFIG.colorLayers = parseInt(e.target.value);
     document.getElementById('colorLayersVal').textContent = CONFIG.colorLayers;
-    if (metaballsMesh?.material.uniforms.uColorLayers) {
-      metaballsMesh.material.uniforms.uColorLayers.value = CONFIG.colorLayers;
-    }
-  });
-  
-  document.getElementById('centerDark')?.addEventListener('input', (e) => {
-    CONFIG.centerDark = parseFloat(e.target.value);
-    document.getElementById('centerDarkVal').textContent = CONFIG.centerDark.toFixed(2);
-    if (metaballsMesh?.material.uniforms.uCenterDark) {
-      metaballsMesh.material.uniforms.uCenterDark.value = CONFIG.centerDark;
-    }
-  });
-  
-  document.getElementById('edgeBright')?.addEventListener('input', (e) => {
-    CONFIG.edgeBright = parseFloat(e.target.value);
-    document.getElementById('edgeBrightVal').textContent = CONFIG.edgeBright.toFixed(1);
-    if (metaballsMesh?.material.uniforms.uEdgeBright) {
-      metaballsMesh.material.uniforms.uEdgeBright.value = CONFIG.edgeBright;
-    }
+    updateColorLayers();
   });
   
   // HSV 颜色选择器辅助函数
@@ -319,16 +342,17 @@ function setupControls() {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
   
-  function setupHSVColor(prefix, uniformName, barId, popupId) {
-    const h = document.getElementById(prefix + 'H');
-    const s = document.getElementById(prefix + 'S');
-    const v = document.getElementById(prefix + 'V');
-    const bar = document.getElementById(barId);
-    const popup = document.getElementById(popupId);
+  function setupHSVColor(num, uniformName) {
+    const h = document.getElementById('color' + num + 'H');
+    const s = document.getElementById('color' + num + 'S');
+    const v = document.getElementById('color' + num + 'V');
+    const bar = document.getElementById('color' + num + 'Bar');
+    const popup = document.getElementById('color' + num + 'Popup');
     
     function update() {
       const hex = hsvToHex(parseInt(h.value), parseInt(s.value), parseInt(v.value));
       bar.style.background = hex;
+      CONFIG['color' + num] = hex;
       if (metaballsMesh?.material.uniforms[uniformName]) {
         metaballsMesh.material.uniforms[uniformName].value.set(hex);
       }
@@ -337,14 +361,12 @@ function setupControls() {
     // 点击颜色条展开/收起 HSV 面板
     bar?.addEventListener('click', (e) => {
       e.stopPropagation();
-      // 关闭其他打开的 popup
       document.querySelectorAll('.hsv-popup.show').forEach(p => {
         if (p !== popup) p.classList.remove('show');
       });
       document.querySelectorAll('.color-bar.active').forEach(b => {
         if (b !== bar) b.classList.remove('active');
       });
-      // 切换当前 popup
       popup?.classList.toggle('show');
       bar?.classList.toggle('active');
     });
@@ -354,9 +376,13 @@ function setupControls() {
     v?.addEventListener('input', update);
   }
   
-  setupHSVColor('baseColor', 'uBaseColor', 'baseColorBar', 'baseColorPopup');
-  setupHSVColor('centerColor', 'uCenterColor', 'centerColorBar', 'centerColorPopup');
-  setupHSVColor('edgeColor', 'uEdgeColor', 'edgeColorBar', 'edgeColorPopup');
+  setupHSVColor(1, 'uColor1');
+  setupHSVColor(2, 'uColor2');
+  setupHSVColor(3, 'uColor3');
+  setupHSVColor(4, 'uColor4');
+  
+  // 初始化颜色层数显示
+  updateColorLayers();
   
   // 点击其他地方关闭 HSV 面板
   document.addEventListener('click', () => {

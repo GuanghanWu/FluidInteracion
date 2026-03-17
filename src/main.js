@@ -301,26 +301,46 @@ function setupControls() {
     }
   });
   
-  document.getElementById('baseColor')?.addEventListener('input', (e) => {
-    CONFIG.baseColor = e.target.value;
-    if (metaballsMesh?.material.uniforms.uBaseColor) {
-      metaballsMesh.material.uniforms.uBaseColor.value.set(e.target.value);
-    }
-  });
+  // HSV 颜色选择器辅助函数
+  function hsvToHex(h, s, v) {
+    s /= 100;
+    v /= 100;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = v - c;
+    let r, g, b;
+    if (h < 60) [r, g, b] = [c, x, 0];
+    else if (h < 120) [r, g, b] = [x, c, 0];
+    else if (h < 180) [r, g, b] = [0, c, x];
+    else if (h < 240) [r, g, b] = [0, x, c];
+    else if (h < 300) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+    const toHex = (n) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
   
-  document.getElementById('centerColor')?.addEventListener('input', (e) => {
-    CONFIG.centerColor = e.target.value;
-    if (metaballsMesh?.material.uniforms.uCenterColor) {
-      metaballsMesh.material.uniforms.uCenterColor.value.set(e.target.value);
+  function setupHSVColor(prefix, uniformName, previewId) {
+    const h = document.getElementById(prefix + 'H');
+    const s = document.getElementById(prefix + 'S');
+    const v = document.getElementById(prefix + 'V');
+    const preview = document.getElementById(previewId);
+    
+    function update() {
+      const hex = hsvToHex(parseInt(h.value), parseInt(s.value), parseInt(v.value));
+      preview.style.background = hex;
+      if (metaballsMesh?.material.uniforms[uniformName]) {
+        metaballsMesh.material.uniforms[uniformName].value.set(hex);
+      }
     }
-  });
+    
+    h?.addEventListener('input', update);
+    s?.addEventListener('input', update);
+    v?.addEventListener('input', update);
+  }
   
-  document.getElementById('edgeColor')?.addEventListener('input', (e) => {
-    CONFIG.edgeColor = e.target.value;
-    if (metaballsMesh?.material.uniforms.uEdgeColor) {
-      metaballsMesh.material.uniforms.uEdgeColor.value.set(e.target.value);
-    }
-  });
+  setupHSVColor('baseColor', 'uBaseColor', 'baseColorPreview');
+  setupHSVColor('centerColor', 'uCenterColor', 'centerColorPreview');
+  setupHSVColor('edgeColor', 'uEdgeColor', 'edgeColorPreview');
   
   // FPS 限制
   document.getElementById('fpsLimit')?.addEventListener('change', (e) => {

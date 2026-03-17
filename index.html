@@ -125,7 +125,7 @@
     }
     .hsv-popup {
       display: none;
-      padding: 6px;
+      padding: 8px;
       background: rgba(0, 40, 50, 0.9);
       border-radius: 4px;
       margin-top: 4px;
@@ -136,7 +136,18 @@
     }
     .hsv-row {
       display: flex;
-      gap: 4px;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .hsv-row:last-child {
+      margin-bottom: 0;
+    }
+    .hsv-row span {
+      width: 16px;
+      font-size: 10px;
+      color: #0ff;
+      text-align: center;
     }
     .hsv-row input[type="range"] {
       flex: 1;
@@ -221,33 +232,27 @@
           <label>Base Color</label>
           <div class="color-bar" id="baseColorBar" style="background: #00ccff;"></div>
           <div class="hsv-popup" id="baseColorPopup">
-            <div class="hsv-row">
-              <input type="range" id="baseColorH" min="0" max="360" value="195" title="Hue">
-              <input type="range" id="baseColorS" min="0" max="100" value="100" title="Saturation">
-              <input type="range" id="baseColorV" min="0" max="100" value="100" title="Value">
-            </div>
+            <div class="hsv-row"><span>H</span><input type="range" id="baseColorH" min="0" max="360" value="195"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="baseColorS" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="baseColorV" min="0" max="100" value="100"></div>
           </div>
         </div>
         <div class="control-group color-item">
           <label>Center Color</label>
           <div class="color-bar" id="centerColorBar" style="background: #001133;"></div>
           <div class="hsv-popup" id="centerColorPopup">
-            <div class="hsv-row">
-              <input type="range" id="centerColorH" min="0" max="360" value="210" title="Hue">
-              <input type="range" id="centerColorS" min="0" max="100" value="100" title="Saturation">
-              <input type="range" id="centerColorV" min="0" max="100" value="20" title="Value">
-            </div>
+            <div class="hsv-row"><span>H</span><input type="range" id="centerColorH" min="0" max="360" value="210"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="centerColorS" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="centerColorV" min="0" max="100" value="20"></div>
           </div>
         </div>
         <div class="control-group color-item">
           <label>Edge Color</label>
           <div class="color-bar" id="edgeColorBar" style="background: #66ffff;"></div>
           <div class="hsv-popup" id="edgeColorPopup">
-            <div class="hsv-row">
-              <input type="range" id="edgeColorH" min="0" max="360" value="180" title="Hue">
-              <input type="range" id="edgeColorS" min="0" max="100" value="100" title="Saturation">
-              <input type="range" id="edgeColorV" min="0" max="100" value="100" title="Value">
-            </div>
+            <div class="hsv-row"><span>H</span><input type="range" id="edgeColorH" min="0" max="360" value="180"></div>
+            <div class="hsv-row"><span>S</span><input type="range" id="edgeColorS" min="0" max="100" value="100"></div>
+            <div class="hsv-row"><span>V</span><input type="range" id="edgeColorV" min="0" max="100" value="100"></div>
           </div>
         </div>
       </div>

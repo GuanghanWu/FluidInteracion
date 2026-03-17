@@ -9,7 +9,7 @@ import { SPHSolver } from './core/SPHSolver.js';
 // 配置
 let CONFIG = {
   particleCount: 300,
-  particleRadius: 0.22,
+  particleRadius: 0.08,
   gravity: { x: 0, y: 0 },
   viscosity: 0.15,
   mouseForce: 2.0,
@@ -221,7 +221,7 @@ function init() {
 
 function updateParticleInstances() {
   const dummy = new THREE.Object3D();
-  const scale = CONFIG.particleRadius * 2.5;
+  const scale = CONFIG.particleRadius * 0.8;
   
   for (let i = 0; i < solver.particles.length; i++) {
     const p = solver.particles[i];
@@ -251,8 +251,8 @@ function setupControls() {
   document.getElementById('radiusScale')?.addEventListener('input', (e) => {
     const scale = parseFloat(e.target.value);
     document.getElementById('radiusVal').textContent = scale.toFixed(1);
-    CONFIG.particleRadius = 0.22 * scale;
-    if (solver) solver.h = 0.35 * scale;
+    CONFIG.particleRadius = 0.08 * scale;
+    if (solver) solver.h = 0.12 * scale;
   });
   
   document.getElementById('viscosity')?.addEventListener('input', (e) => {

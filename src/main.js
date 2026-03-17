@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.33 - Profile折叠页+FPS限制
+ * Version: 0.34 - 密度控制+粒子大小优化
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -105,8 +105,8 @@ function init() {
     depthWrite: false
   });
   
-  // InstancedMesh 用于批量渲染粒子
-  particleMesh = new THREE.InstancedMesh(particleGeo, particleMaterial, 1000);
+  // InstancedMesh 用于批量渲染粒子（容量支持最大密度）
+  particleMesh = new THREE.InstancedMesh(particleGeo, particleMaterial, 1600);
   particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   particleScene.add(particleMesh);
   

@@ -319,28 +319,50 @@ function setupControls() {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
   
-  function setupHSVColor(prefix, uniformName, previewId) {
+  function setupHSVColor(prefix, uniformName, barId, popupId) {
     const h = document.getElementById(prefix + 'H');
     const s = document.getElementById(prefix + 'S');
     const v = document.getElementById(prefix + 'V');
-    const preview = document.getElementById(previewId);
+    const bar = document.getElementById(barId);
+    const popup = document.getElementById(popupId);
     
     function update() {
       const hex = hsvToHex(parseInt(h.value), parseInt(s.value), parseInt(v.value));
-      preview.style.background = hex;
+      bar.style.background = hex;
       if (metaballsMesh?.material.uniforms[uniformName]) {
         metaballsMesh.material.uniforms[uniformName].value.set(hex);
       }
     }
+    
+    // 点击颜色条展开/收起 HSV 面板
+    bar?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // 关闭其他打开的 popup
+      document.querySelectorAll('.hsv-popup.show').forEach(p => {
+        if (p !== popup) p.classList.remove('show');
+      });
+      document.querySelectorAll('.color-bar.active').forEach(b => {
+        if (b !== bar) b.classList.remove('active');
+      });
+      // 切换当前 popup
+      popup?.classList.toggle('show');
+      bar?.classList.toggle('active');
+    });
     
     h?.addEventListener('input', update);
     s?.addEventListener('input', update);
     v?.addEventListener('input', update);
   }
   
-  setupHSVColor('baseColor', 'uBaseColor', 'baseColorPreview');
-  setupHSVColor('centerColor', 'uCenterColor', 'centerColorPreview');
-  setupHSVColor('edgeColor', 'uEdgeColor', 'edgeColorPreview');
+  setupHSVColor('baseColor', 'uBaseColor', 'baseColorBar', 'baseColorPopup');
+  setupHSVColor('centerColor', 'uCenterColor', 'centerColorBar', 'centerColorPopup');
+  setupHSVColor('edgeColor', 'uEdgeColor', 'edgeColorBar', 'edgeColorPopup');
+  
+  // 点击其他地方关闭 HSV 面板
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.hsv-popup.show').forEach(p => p.classList.remove('show'));
+    document.querySelectorAll('.color-bar.active').forEach(b => b.classList.remove('active'));
+  });
   
   // FPS 限制
   document.getElementById('fpsLimit')?.addEventListener('change', (e) => {

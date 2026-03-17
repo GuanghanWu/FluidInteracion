@@ -412,16 +412,9 @@ function applyMouseForce() {
 function animate() {
   requestAnimationFrame(animate);
   
-  // FPS 限制
   const now = performance.now();
-  const delta = now - lastFrameTime;
-  const frameInterval = 1000 / CONFIG.fpsLimit;
   
-  if (delta < frameInterval) return;
-  
-  lastFrameTime = now - (delta % frameInterval);
-  
-  // 物理更新
+  // 物理更新（每帧都执行，保证触控响应）
   solver.step();
   applyMouseForce();
   
@@ -431,20 +424,30 @@ function animate() {
     p.applyHardBounds(-aspect * 0.95, -0.95, aspect * 0.95, 0.95, 1.0);
   }
   
-  // 更新粒子位置到 GPU
-  updateParticleInstances();
+  // FPS 限制 - 只限制渲染
+  const delta = now - lastFrameTime;
+  const frameInterval = 1000 / CONFIG.fpsLimit;
   
-  // 渲染 metaballs 到纹理（GPU）
-  renderer.setRenderTarget(metaballsRT);
-  renderer.clear();
-  renderer.render(particleScene, particleCamera);
+  if (delta >= frameInterval) {
+    lastFrameTime = now - (delta % frameInterval);
+    
+    // 更新粒子位置到 GPU
+    updateParticleInstances();
+    
+    // 渲染 metaballs 到纹理（GPU）
+    renderer.setRenderTarget(metaballsRT);
+    renderer.clear();
+    renderer.render(particleScene, particleCamera);
+    
+    // 渲染主场景
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+    
+    // FPS 统计
+    frameCount++;
+  }
   
-  // 渲染主场景
-  renderer.setRenderTarget(null);
-  renderer.render(scene, camera);
-  
-  // FPS 统计
-  frameCount++;
+  // FPS 显示更新（每秒一次）
   if (now - lastTime >= 1000) {
     document.getElementById('fps').textContent = frameCount;
     document.getElementById('count').textContent = solver.particles.length;

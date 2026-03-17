@@ -233,20 +233,15 @@
     .color-dot.hidden {
       display: none;
     }
-    .hsv-panel {
+    .hsv-inline {
       display: none;
-      position: absolute;
-      left: 100%;
-      top: 0;
-      margin-left: 8px;
       padding: 8px;
-      background: rgba(0, 30, 40, 0.95);
+      background: rgba(0, 30, 40, 0.8);
       border-radius: 4px;
+      margin-top: 8px;
       border: 1px solid rgba(0, 255, 255, 0.3);
-      width: 140px;
-      z-index: 100;
     }
-    .hsv-panel.show {
+    .hsv-inline.show {
       display: block;
     }
     /* 面板折叠 */
@@ -305,7 +300,7 @@
         <!-- Colors 二级折叠页 -->
         <div class="sub-accordion">
           <div class="sub-header collapsed" data-sub="colors">Colors</div>
-          <div class="sub-content collapsed" id="colors" style="position: relative;">
+          <div class="sub-content collapsed" id="colors">
             <div class="sub-control">
               <label>Layers: <span id="colorLayersVal">3</span></label>
               <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">
@@ -316,7 +311,7 @@
               <div class="color-dot" id="color3Dot" style="background: #0088cc;" title="Color 3"></div>
               <div class="color-dot" id="color4Dot" style="background: #001133;" title="Color 4 (Center)"></div>
             </div>
-            <div class="hsv-panel" id="hsvPanel">
+            <div class="hsv-inline" id="hsvPanel">
               <div class="hsv-row"><span>H</span><input type="range" id="activeColorH" min="0" max="360"></div>
               <div class="hsv-row"><span>S</span><input type="range" id="activeColorS" min="0" max="100"></div>
               <div class="hsv-row"><span>V</span><input type="range" id="activeColorV" min="0" max="100"></div>
@@ -354,7 +349,7 @@
           <div class="sub-content collapsed" id="edge">
             <div class="sub-control">
               <label>Softness: <span id="edgeSoftnessVal">0.5</span></label>
-              <input type="range" id="edgeSoftness" min="0" max="1.0" value="0.5" step="0.05">
+              <input type="range" id="edgeSoftness" min="0" max="1.0" value="0.5" step="0.1">
             </div>
           </div>
         </div>
@@ -380,7 +375,7 @@
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
     </div>
   </div>
-  <div id="version">v0.39</div>
+  <div id="version">v0.40</div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

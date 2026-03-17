@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.39 - Random噪声算法实现(Perlin/Simplex/White)
+ * Version: 0.40 - HSV面板放颜色下方，EdgeSoftness效果增强
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -182,8 +182,8 @@ function init() {
         float layerIndex = floor(logField * layers);
         float t = fract(logField * layers);
         
-        // EdgeSoftness 模糊层间过渡
-        float softness = 0.5 + uEdgeSoftness * 0.5;
+        // EdgeSoftness 模糊层间过渡（效果更明显）
+        float softness = uEdgeSoftness;
         t = smoothstep(0.5 - softness * 0.5, 0.5 + softness * 0.5, t);
         
         vec3 colorA, colorB;

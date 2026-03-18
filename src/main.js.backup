@@ -752,8 +752,151 @@ function animate() {
 
 // ==================== 手势控制 (MediaPipe Hands) ====================
 
+let isHandsLoading = false;
 
-// ==================== 手势控制 (GestureRecognizer) ====================
+function initHandTracking() {
+  // 检查 MediaPipe 是否加载
+  if (!window.Hands) {
+    console.error('[ERROR] MediaPipe Hands not loaded');
+    debugLog('error', 'MediaPipe Hands not loaded');
+    showCameraError('MediaPipe Hands 加载失败，请检查网络连接');
+    return false;
+  }
+  
+  if (hands) {
+    console.log('[INFO] Hands already initialized');
+    return true;
+  }
+  
+  if (isHandsLoading) {
+    console.log('[INFO] Hands is loading...');
+    return true;
+  }
+  
+  isHandsLoading = true;
+  console.log('[INFO] MediaPipe Hands found, initializing...');
+  
+  // 初始化 Hands
+  hands = new window.Hands({
+    locateFile: (file) => {
+      // MediaPipe 需要从 CDN 加载模型文件
+      const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      return url;
+    }
+  });
+  
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+    selfieMode: true
+  });
+  
+  hands.onResults(onHandResults);
+  
+  // 捕获模型加载错误
+  hands.setOptions = new Proxy(hands.setOptions, {
+    apply(target, thisArg, args) {
+      try {
+        return target.apply(thisArg, args);
+      } catch (e) {
+        debugLog('error', 'Hands setOptions failed: ' + e.message);
+        throw e;
+      }
+    }
+  });
+  
+  isHandsLoading = false;
+  
+  debugLog('info', 'Hands initialized');
+  return true;
+}
+
+let handFrameCount = 0;
+let lastHandDetectionTime = 0;
+
+function onHandResults(results) {
+  const handStatus = document.getElementById('handStatus');
+  const handX = document.getElementById('handX');
+  const handY = document.getElementById('handY');
+  const handState = document.getElementById('handState');
+  
+  // 调试：每秒打印一次检测状态
+  const now = Date.now();
+  if (now - lastHandDetectionTime > 1000) {
+    lastHandDetectionTime = now;
+    const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+    console.log(`[INFO] Hand detection: ${count} hand(s)`);
+    debugLog('info', `Hand detection: ${count} hand(s)`);
+  }
+  
+  // 检测到手时打印详细信息
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+    const wrist = landmarks[0];
+    console.log('[INFO] Hand DETECTED! wrist:', wrist.x.toFixed(2), wrist.y.toFixed(2));
+    debugLog('info', `Hand detected at ${(wrist.x * 100).toFixed(0)}%, ${(wrist.y * 100).toFixed(0)}%`);
+  }
+  
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    // 获取最靠近的手（第一个，因为 maxNumHands=1）
+    const landmarks = results.multiHandLandmarks[0];
+    
+    // 使用手腕 (index 0) 作为手的位置
+    // MediaPipe 坐标系: x[0-1] 左到右, y[0-1] 上到下
+    // 需要映射到屏幕坐标，然后转换到世界坐标
+    const wrist = landmarks[0];
+    const indexTip = landmarks[8];
+    const thumbTip = landmarks[4];
+    
+    // MediaPipe 坐标: x[0-1]左到右, y[0-1]上到下
+    // 直接映射到 Three.js 世界坐标 (归一化设备坐标 NDC)
+    // x: -aspect ~ aspect, y: -1 ~ 1
+    const aspect = window.innerWidth / window.innerHeight;
+    const ndcX = (1 - wrist.x) * 2 - 1;  // 镜像并转为 -1~1
+    const ndcY = -(wrist.y * 2 - 1);      // 转为 -1~1 并翻转Y
+    
+    const worldPos = {
+      x: ndcX * aspect,
+      y: ndcY
+    };
+    handTracking.x = worldPos.x;
+    handTracking.y = worldPos.y;
+    handTracking.isDetected = true;
+    
+    // 检测捏合手势（拇指和食指距离）
+    const pinchDist = Math.sqrt(
+      Math.pow(indexTip.x - thumbTip.x, 2) + 
+      Math.pow(indexTip.y - thumbTip.y, 2)
+    );
+    handTracking.isPinching = pinchDist < 0.05;
+    handTracking.isOpen = pinchDist > 0.15;
+    
+    // 更新 UI 显示（显示百分比）
+    if (handX) handX.textContent = ((1 - wrist.x) * 100).toFixed(0) + '%';
+    if (handY) handY.textContent = (wrist.y * 100).toFixed(0) + '%';
+    if (handState) {
+      let state = 'Detected';
+      if (handTracking.isPinching) state += ' | Pinch';
+      else if (handTracking.isOpen) state += ' | Open';
+      handState.textContent = state;
+      handState.style.color = '#0ff';
+    }
+  } else {
+    // 没有检测到手
+    handTracking.isDetected = false;
+    handTracking.isPinching = false;
+    handTracking.isOpen = false;
+    
+    if (handState) {
+      handState.textContent = 'Waiting for hand...';
+      handState.style.color = '#888';
+    }
+    if (handX) handX.textContent = '--';
+    if (handY) handY.textContent = '--';
+  }
+}
 
 async function startCamera() {
   const cameraToggle = document.getElementById('cameraToggle');
@@ -762,13 +905,12 @@ async function startCamera() {
   const handState = document.getElementById('handState');
   const cameraPreview = document.getElementById('cameraPreview');
   
+  if (!initHandTracking()) {
+    cameraToggle.checked = false;
+    return;
+  }
+  
   try {
-    debugLog('info', 'Initializing GestureRecognizer...');
-    const success = await initGestureRecognizer();
-    if (!success) {
-      throw new Error('Failed to initialize gesture recognizer');
-    }
-    
     const videoElement = document.getElementById('previewVideo');
     if (!videoElement) {
       throw new Error('Preview video element not found');
@@ -797,46 +939,44 @@ async function startCamera() {
       handState.style.color = '#888';
     }
     
-    debugLog('info', 'Camera started: ' + videoElement.videoWidth + 'x' + videoElement.videoHeight);
+    console.log('[INFO] Camera started:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+    debugLog('info', 'Camera started');
     
     // 检测循环
-    function detectLoop() {
+    let frameCount = 0;
+    let lastLogTime = 0;
+    let errorCount = 0;
+    async function detectLoop() {
       if (!isCameraActive) return;
       
-      if (videoElement.readyState >= 2) {
-        const result = detectGesture(videoElement);
-        
-        if (result) {
-          handTracking.isDetected = true;
-          handTracking.x = (1 - result.x) * 2 - 1;
-          handTracking.y = -(result.y * 2 - 1);
-          handTracking.gesture = result.gesture;
+      if (hands && videoElement.readyState >= 2) {
+        try {
+          frameCount++;
+          await hands.send({ image: videoElement });
+          errorCount = 0;  // 成功时重置错误计数
           
-          const handX = document.getElementById('handX');
-          const handY = document.getElementById('handY');
-          if (handX) handX.textContent = ((1 - result.x) * 100).toFixed(0) + '%';
-          if (handY) handY.textContent = (result.y * 100).toFixed(0) + '%';
-          if (handState) {
-            handState.textContent = 'Detected: ' + result.gesture;
-            handState.style.color = '#0ff';
+          const now = Date.now();
+          if (now - lastLogTime > 1000) {
+            lastLogTime = now;
+            debugLog('info', 'Frames: ' + frameCount);
           }
-          
-          debugLog('info', `Hand: ${result.gesture} at ${((1-result.x)*100).toFixed(0)}%, ${(result.y*100).toFixed(0)}%`);
-        } else {
-          handTracking.isDetected = false;
-          if (handState) {
-            handState.textContent = 'Waiting for hand...';
-            handState.style.color = '#888';
+        } catch (e) {
+          errorCount++;
+          if (errorCount <= 3) {  // 只显示前3个错误
+            debugLog('error', 'Detection error: ' + e.message);
+          }
+          if (errorCount === 3) {
+            debugLog('error', 'Too many errors, stopping detection');
           }
         }
       }
-      
       requestAnimationFrame(detectLoop);
     }
     detectLoop();
     
   } catch (error) {
-    debugLog('error', 'Camera failed: ' + error.message);
+    console.error('[ERROR] Camera failed:', error);
+    debugLog('error', `Camera failed: ${error.message}`);
     showCameraError('无法启动摄像头: ' + error.message);
     cameraToggle.checked = false;
     isCameraActive = false;
@@ -859,14 +999,16 @@ function stopCamera() {
   
   isCameraActive = false;
   handTracking.isDetected = false;
+  handTracking.isPinching = false;
+  handTracking.isOpen = false;
   
-  disposeGestureRecognizer();
-  
+  // 停止视频流
   if (videoElement && videoElement.srcObject) {
     videoElement.srcObject.getTracks().forEach(track => track.stop());
     videoElement.srcObject = null;
   }
   
+  // 隐藏面板和预览
   if (handStatus) handStatus.style.display = 'none';
   if (previewControl) previewControl.style.display = 'none';
   if (cameraPreview) cameraPreview.style.display = 'none';
@@ -879,7 +1021,7 @@ function stopCamera() {
     handState.style.color = '#888';
   }
   
-  debugLog('info', 'Camera stopped');
+  console.log('Camera stopped');
 }
 
 function showCameraError(message) {

@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
-import { initGestureRecognizer, detectGesture, disposeGestureRecognizer } from './handTracking.js';
+import { loadMediaPipe, initGestureRecognizer, detectGesture, disposeGestureRecognizer } from './handTracking.js';
 
 // 手势控制全局变量
 let isCameraActive = false;

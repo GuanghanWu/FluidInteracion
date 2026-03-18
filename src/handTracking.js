@@ -1,9 +1,28 @@
 // MediaPipe GestureRecognizer 手势追踪
-// 使用新版 @mediapipe/tasks-vision API
+// 使用动态 import 确保加载完成
 
 let gestureRecognizer = null;
 let isGestureLoading = false;
 let lastVideoTime = -1;
+let GestureRecognizer = null;
+let FilesetResolver = null;
+
+export async function loadMediaPipe() {
+  if (GestureRecognizer && FilesetResolver) return true;
+  
+  try {
+    // 动态导入 MediaPipe
+    const module = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm');
+    GestureRecognizer = module.GestureRecognizer;
+    FilesetResolver = module.FilesetResolver;
+    
+    console.log('[Gesture] Module loaded:', !!GestureRecognizer, !!FilesetResolver);
+    return true;
+  } catch (err) {
+    console.error('[Gesture] Load failed:', err);
+    throw new Error('Failed to load MediaPipe: ' + err.message);
+  }
+}
 
 export async function initGestureRecognizer() {
   if (gestureRecognizer) return true;
@@ -13,14 +32,14 @@ export async function initGestureRecognizer() {
   console.log('[Gesture] Initializing...');
   
   try {
-    const { GestureRecognizer, FilesetResolver } = window;
+    await loadMediaPipe();
     
     if (!GestureRecognizer || !FilesetResolver) {
-      throw new Error('MediaPipe Tasks Vision not loaded');
+      throw new Error('MediaPipe Tasks Vision not available');
     }
     
     const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
     );
     
     gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
@@ -52,7 +71,7 @@ export function detectGesture(video) {
   
   if (results.gestures.length > 0 && results.landmarks.length > 0) {
     const landmarks = results.landmarks[0];
-    const wrist = landmarks[0];  // 手腕位置
+    const wrist = landmarks[0];
     
     return {
       x: wrist.x,

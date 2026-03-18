@@ -789,9 +789,9 @@ function initHandTracking() {
   
   hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 0,  // 轻量级模型，提高性能
-    minDetectionConfidence: 0.3,
-    minTrackingConfidence: 0.3,
+    modelComplexity: 1,  // 中等复杂度，提高精度
+    minDetectionConfidence: 0.7,  // 高阈值，减少误检
+    minTrackingConfidence: 0.7,
     selfieMode: true
   });
   
@@ -853,8 +853,6 @@ function onHandResults(results) {
     };
     handTracking.x = worldPos.x;
     handTracking.y = worldPos.y;
-    handTracking.x = worldPos.x;
-    handTracking.y = worldPos.y;
     handTracking.isDetected = true;
     
     // 检测捏合手势（拇指和食指距离）
@@ -862,12 +860,12 @@ function onHandResults(results) {
       Math.pow(indexTip.x - thumbTip.x, 2) + 
       Math.pow(indexTip.y - thumbTip.y, 2)
     );
-    handTracking.isPinching = pinchDist < 0.05;  // 阈值可调
-    handTracking.isOpen = pinchDist > 0.15;      // 张开阈值
+    handTracking.isPinching = pinchDist < 0.05;
+    handTracking.isOpen = pinchDist > 0.15;
     
-    // 更新 UI 显示
-    if (handX) handX.textContent = screenX.toFixed(0);
-    if (handY) handY.textContent = screenY.toFixed(0);
+    // 更新 UI 显示（显示百分比）
+    if (handX) handX.textContent = ((1 - wrist.x) * 100).toFixed(0) + '%';
+    if (handY) handY.textContent = (wrist.y * 100).toFixed(0) + '%';
     if (handState) {
       let state = 'Detected';
       if (handTracking.isPinching) state += ' | Pinch';

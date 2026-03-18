@@ -8,7 +8,6 @@ import { SPHSolver } from './core/SPHSolver.js';
 
 // 手势控制全局变量
 let hands = null;
-let cameraUtils = null;
 let isCameraActive = false;
 let handTracking = {
   x: 0,
@@ -896,6 +895,7 @@ async function startCamera() {
   const handStatus = document.getElementById('handStatus');
   const previewControl = document.getElementById('previewControl');
   const handState = document.getElementById('handState');
+  const cameraPreview = document.getElementById('cameraPreview');
   
   if (!initHandTracking()) {
     cameraToggle.checked = false;
@@ -903,66 +903,27 @@ async function startCamera() {
   }
   
   try {
-    // 使用预览视频元素
     const videoElement = document.getElementById('previewVideo');
     if (!videoElement) {
       throw new Error('Preview video element not found');
     }
     
-    // 使用 CameraUtils 启动摄像头
-    const Camera = window.Camera;
-    if (!Camera) {
-      throw new Error('Camera utils not loaded');
-    }
-    
-    // 更新状态
     if (handState) {
       handState.textContent = 'Starting camera...';
       handState.style.color = '#0ff';
     }
     
-    // 视频调试 - 每帧处理（确保检测率）
-    let frameCount = 0;
-    let lastLogTime = 0;
-    cameraUtils = new Camera(videoElement, {
-      onFrame: async () => {
-        if (hands && isCameraActive && videoElement.readyState >= 2) {
-          try {
-            frameCount++;
-            // 每帧都发送，确保最大检测率
-            await hands.send({ image: videoElement });
-            
-            // 每秒打印一次状态
-            const now = Date.now();
-            if (now - lastLogTime > 1000) {
-              lastLogTime = now;
-              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight, 'frames:', frameCount);
-            }
-          } catch (e) {
-            console.error('[ERROR] Hands send error:', e);
-          }
-        }
-      },
-      width: 640,  // 恢复更高分辨率，提高检测精度
-      height: 480
+    // 标准 getUserMedia 启动摄像头
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
     });
     
-    await cameraUtils.start();
+    videoElement.srcObject = stream;
+    await videoElement.play();
+    
     isCameraActive = true;
     
-    // 等待视频准备好
-    if (videoElement.readyState < 2) {
-      console.log('[INFO] Waiting for video to be ready...');
-      await new Promise(resolve => {
-        videoElement.onloadeddata = () => {
-          console.log('[INFO] Video ready, playing');
-          resolve();
-        };
-      });
-    }
-    console.log('[INFO] Video state:', videoElement.readyState, 'playing:', !videoElement.paused);
-    
-    // 显示手坐标面板和预览控制
+    if (cameraPreview) cameraPreview.style.display = 'block';
     if (handStatus) handStatus.style.display = 'block';
     if (previewControl) previewControl.style.display = 'block';
     if (handState) {
@@ -970,10 +931,35 @@ async function startCamera() {
       handState.style.color = '#888';
     }
     
-    console.log('[INFO] Camera started successfully');
-    debugLog('info', 'Camera started successfully');
+    console.log('[INFO] Camera started:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+    debugLog('info', 'Camera started');
+    
+    // 检测循环
+    let frameCount = 0;
+    let lastLogTime = 0;
+    async function detectLoop() {
+      if (!isCameraActive) return;
+      
+      if (hands && videoElement.readyState >= 2) {
+        try {
+          frameCount++;
+          await hands.send({ image: videoElement });
+          
+          const now = Date.now();
+          if (now - lastLogTime > 1000) {
+            lastLogTime = now;
+            console.log('[INFO] Frames processed:', frameCount);
+          }
+        } catch (e) {
+          console.error('[ERROR] Detection error:', e);
+        }
+      }
+      requestAnimationFrame(detectLoop);
+    }
+    detectLoop();
+    
   } catch (error) {
-    console.error('[ERROR] Camera failed:', error.message);
+    console.error('[ERROR] Camera failed:', error);
     debugLog('error', `Camera failed: ${error.message}`);
     showCameraError('无法启动摄像头: ' + error.message);
     cameraToggle.checked = false;
@@ -990,6 +976,7 @@ function stopCamera() {
   const previewControl = document.getElementById('previewControl');
   const cameraPreview = document.getElementById('cameraPreview');
   const previewToggle = document.getElementById('previewToggle');
+  const videoElement = document.getElementById('previewVideo');
   const handX = document.getElementById('handX');
   const handY = document.getElementById('handY');
   const handState = document.getElementById('handState');
@@ -999,9 +986,10 @@ function stopCamera() {
   handTracking.isPinching = false;
   handTracking.isOpen = false;
   
-  if (cameraUtils) {
-    cameraUtils.stop();
-    cameraUtils = null;
+  // 停止视频流
+  if (videoElement && videoElement.srcObject) {
+    videoElement.srcObject.getTracks().forEach(track => track.stop());
+    videoElement.srcObject = null;
   }
   
   // 隐藏面板和预览

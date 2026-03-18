@@ -766,6 +766,8 @@ function animate() {
 
 // ==================== 手势控制 (MediaPipe Hands) ====================
 
+let isHandsLoading = false;
+
 function initHandTracking() {
   // 检查 MediaPipe 是否加载
   if (!window.Hands) {
@@ -775,6 +777,17 @@ function initHandTracking() {
     return false;
   }
   
+  if (hands) {
+    console.log('[INFO] Hands already initialized');
+    return true;
+  }
+  
+  if (isHandsLoading) {
+    console.log('[INFO] Hands is loading...');
+    return true;
+  }
+  
+  isHandsLoading = true;
   console.log('[INFO] MediaPipe Hands found, initializing...');
   
   // 初始化 Hands
@@ -782,27 +795,27 @@ function initHandTracking() {
     locateFile: (file) => {
       // MediaPipe 需要从 CDN 加载模型文件
       const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-      console.log('[INFO] Loading MediaPipe file:', file);
-      debugLog('info', `Loading: ${file}`);
       return url;
     }
   });
   
   hands.setOptions({
-    maxNumHands: 1,           // 只识别最靠近的一只手
-    modelComplexity: 0,       // 轻量级模型，提高检测速度
-    minDetectionConfidence: 0.1,  // 进一步降低阈值
-    minTrackingConfidence: 0.1
+    maxNumHands: 1,
+    modelComplexity: 1,       // 用中等复杂度，轻量级可能不稳定
+    minDetectionConfidence: 0.3,
+    minTrackingConfidence: 0.3
   });
   
   hands.onResults(onHandResults);
   
-  console.log('[INFO] MediaPipe Hands initialized successfully');
+  console.log('[INFO] MediaPipe Hands initialized');
   debugLog('info', 'MediaPipe Hands initialized');
+  isHandsLoading = false;
   return true;
 }
 
 let handFrameCount = 0;
+let lastHandDetectionTime = 0;
 
 function onHandResults(results) {
   const handStatus = document.getElementById('handStatus');
@@ -810,18 +823,18 @@ function onHandResults(results) {
   const handY = document.getElementById('handY');
   const handState = document.getElementById('handState');
   
-  // 调试：每30帧打印一次
-  handFrameCount++;
-  if (handFrameCount % 30 === 0) {
+  // 调试：每秒打印一次检测状态
+  const now = Date.now();
+  if (now - lastHandDetectionTime > 1000) {
+    lastHandDetectionTime = now;
     const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-    const image = results.image;
-    console.log(`[INFO] Hand detection: ${count} hand(s), image: ${image ? image.width + 'x' + image.height : 'null'}`);
+    console.log(`[INFO] Hand detection: ${count} hand(s)`);
     debugLog('info', `Hand detection: ${count} hand(s)`);
   }
   
-  // 每次检测都打印（调试用）
+  // 检测到手时打印
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    console.log('[INFO] Hand DETECTED!');
+    console.log('[INFO] Hand DETECTED! landmarks:', results.multiHandLandmarks[0].length);
     debugLog('info', 'Hand DETECTED!');
   }
   

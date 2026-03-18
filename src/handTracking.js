@@ -10,18 +10,30 @@ let FilesetResolver = null;
 export async function loadMediaPipe() {
   if (GestureRecognizer && FilesetResolver) return true;
   
-  try {
-    // 动态导入 MediaPipe
-    const module = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm');
-    GestureRecognizer = module.GestureRecognizer;
-    FilesetResolver = module.FilesetResolver;
-    
-    console.log('[Gesture] Module loaded:', !!GestureRecognizer, !!FilesetResolver);
-    return true;
-  } catch (err) {
-    console.error('[Gesture] Load failed:', err);
-    throw new Error('Failed to load MediaPipe: ' + err.message);
+  // 尝试多个 CDN 源
+  const cdnUrls = [
+    'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/+esm',
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm',
+    'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm'
+  ];
+  
+  for (const url of cdnUrls) {
+    try {
+      console.log('[Gesture] Trying CDN:', url);
+      const module = await import(url);
+      GestureRecognizer = module.GestureRecognizer;
+      FilesetResolver = module.FilesetResolver;
+      
+      if (GestureRecognizer && FilesetResolver) {
+        console.log('[Gesture] Module loaded from:', url);
+        return true;
+      }
+    } catch (err) {
+      console.log('[Gesture] CDN failed:', url, err.message);
+    }
   }
+  
+  throw new Error('All CDN sources failed');
 }
 
 export async function initGestureRecognizer() {

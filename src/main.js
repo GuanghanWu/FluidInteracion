@@ -91,9 +91,17 @@ const PARTICLE_QUAD_SIZE = 0.15;
 try {
   init();
   animate();
-  // 测试日志显示
+  // 测试日志显示（不依赖 Debug 开关）
   setTimeout(() => {
-    debugLog('warning', 'test');
+    console.log('[TEST] This is a test log');
+    // 直接操作 DOM 添加测试日志
+    const logContent = document.getElementById('debugLogContent');
+    if (logContent) {
+      const testEntry = document.createElement('div');
+      testEntry.innerHTML = '<span style="color: #666;">[TEST]</span> <span style="color: #ff0;">WARNING</span>: 测试用<br>测试用行二';
+      testEntry.style.cssText = 'margin-bottom: 4px; padding: 2px 0; border-bottom: 1px solid rgba(0,255,255,0.1);';
+      logContent.appendChild(testEntry);
+    }
   }, 1000);
 } catch (error) {
   console.error('Initialization error:', error);

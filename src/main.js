@@ -789,17 +789,27 @@ function initHandTracking() {
   
   hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 1,  // 中等复杂度，提高精度
-    minDetectionConfidence: 0.7,  // 高阈值，减少误检
-    minTrackingConfidence: 0.7,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,  // 官方默认值
+    minTrackingConfidence: 0.5,
     selfieMode: true
   });
   
   hands.onResults(onHandResults);
   
-  console.log('[INFO] MediaPipe Hands initialized');
-  debugLog('info', 'MediaPipe Hands initialized');
-  isHandsLoading = false;
+  // 等待模型加载完成
+  hands.initialize().then(() => {
+    console.log('[INFO] MediaPipe Hands model loaded');
+    debugLog('info', 'Hands model loaded');
+    isHandsLoading = false;
+  }).catch(err => {
+    console.error('[ERROR] Hands model failed:', err);
+    debugLog('error', 'Hands model failed: ' + err.message);
+    isHandsLoading = false;
+  });
+  
+  console.log('[INFO] MediaPipe Hands initializing...');
+  debugLog('info', 'Hands initializing...');
   return true;
 }
 
@@ -922,23 +932,23 @@ async function startCamera() {
     let frameCount = 0;
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
-        if (hands && isCameraActive && videoElement.readyState >= 2) {
+        if (hands && isCameraActive && videoElement.readyState >= 2 && !isHandsLoading) {
           try {
             frameCount++;
-            // 每3帧处理一次（约10-20fps），平衡性能和检测率
+            // 每3帧处理一次
             if (frameCount % 3 === 0) {
               await hands.send({ image: videoElement });
             }
-            // 每180帧（约6秒）打印一次视频状态
+            // 每180帧打印一次状态
             if (frameCount % 180 === 0) {
-              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight, 'modelReady:', !isHandsLoading);
             }
           } catch (e) {
             console.error('[ERROR] Hands send error:', e);
           }
         }
       },
-      width: 320,  // 降低分辨率，提高性能
+      width: 320,
       height: 240
     });
     

@@ -357,6 +357,28 @@
       </div>
     </div>
     
+    <!-- Input 折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="input">Input</div>
+      <div class="accordion-content collapsed" id="input">
+        <div class="control-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cameraToggle" style="cursor: pointer;">
+            <span>Camera (Hand Tracking)</span>
+          </label>
+        </div>
+        <div class="control-group" id="handStatus" style="display: none;">
+          <label>Hand Position:</label>
+          <div style="font-family: monospace; font-size: 11px; color: #0ff; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 3px;">
+            X: <span id="handX">--</span><br>
+            Y: <span id="handY">--</span><br>
+            <span id="handState" style="color: #888;">Waiting for hand...</span>
+          </div>
+        </div>
+        <div class="control-group" id="cameraError" style="display: none; color: #f66; font-size: 11px;"></div>
+      </div>
+    </div>
+    
     <!-- Profile 折叠页 -->
     <div class="accordion">
       <div class="accordion-header collapsed" data-accordion="profile">Profile</div>
@@ -375,7 +397,12 @@
     <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
     </div>
   </div>
-  <div id="version">v0.40</div>
+  <div id="version">v0.41</div>
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

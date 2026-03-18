@@ -1,10 +1,22 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.40 - HSV面板放颜色下方，EdgeSoftness效果增强
+ * Version: 0.41 - 添加手势控制 (MediaPipe Hands)
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
+
+// 手势控制全局变量
+let hands = null;
+let cameraUtils = null;
+let isCameraActive = false;
+let handTracking = {
+  x: 0,
+  y: 0,
+  isDetected: false,
+  isPinching: false,
+  isOpen: false
+};
 
 // 配置
 let CONFIG = {
@@ -511,6 +523,15 @@ function setupControls() {
     document.getElementById('fpsLimitVal').textContent = CONFIG.fpsLimit;
   });
   
+  // 摄像头开关
+  document.getElementById('cameraToggle')?.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  });
+  
   // 主折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
@@ -561,6 +582,8 @@ function screenToWorld(clientX, clientY) {
 }
 
 function onMouseMove(e) {
+  // 如果手势控制激活，鼠标移动不覆盖手势位置
+  if (handTracking.isDetected) return;
   const pos = screenToWorld(e.clientX, e.clientY);
   mouse.x = pos.x;
   mouse.y = pos.y;
@@ -568,6 +591,8 @@ function onMouseMove(e) {
 
 function onTouchStart(e) {
   e.preventDefault();
+  // 如果手势控制激活，触控不覆盖手势位置
+  if (handTracking.isDetected) return;
   const touch = e.touches[0];
   const pos = screenToWorld(touch.clientX, touch.clientY);
   mouse.x = pos.x;
@@ -577,6 +602,7 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   e.preventDefault();
+  if (handTracking.isDetected) return;
   const touch = e.touches[0];
   const pos = screenToWorld(touch.clientX, touch.clientY);
   mouse.x = pos.x;
@@ -584,18 +610,24 @@ function onTouchMove(e) {
 }
 
 function applyMouseForce() {
-  if (!mouse.isDown) return;
+  // 手势控制：手检测到时，模拟鼠标按下
+  const isHandActive = handTracking.isDetected;
+  if (!mouse.isDown && !isHandActive) return;
+  
+  // 如果手势激活，使用手势位置
+  const targetX = isHandActive ? handTracking.x : mouse.x;
+  const targetY = isHandActive ? handTracking.y : mouse.y;
   
   if (solver.particles.length < CONFIG.particleCount && Math.random() < 0.2) {
     solver.addParticle(
-      mouse.x + (Math.random() - 0.5) * 0.2,
-      mouse.y + (Math.random() - 0.5) * 0.2
+      targetX + (Math.random() - 0.5) * 0.2,
+      targetY + (Math.random() - 0.5) * 0.2
     );
   }
   
   for (const p of solver.particles) {
-    const dx = mouse.x - p.x;
-    const dy = mouse.y - p.y;
+    const dx = targetX - p.x;
+    const dy = targetY - p.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist < CONFIG.mouseRadius && dist > 0.05) {
@@ -650,5 +682,179 @@ function animate() {
     document.getElementById('count').textContent = solver.particles.length;
     frameCount = 0;
     lastTime = now;
+  }
+}
+
+// ==================== 手势控制 (MediaPipe Hands) ====================
+
+function initHandTracking() {
+  // 检查 MediaPipe 是否加载
+  if (!window.Hands) {
+    console.error('MediaPipe Hands not loaded');
+    showCameraError('MediaPipe Hands 加载失败，请检查网络连接');
+    return false;
+  }
+  
+  // 初始化 Hands
+  hands = new window.Hands({
+    locateFile: (file) => {
+      return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    }
+  });
+  
+  hands.setOptions({
+    maxNumHands: 1,           // 只识别最靠近的一只手
+    modelComplexity: 1,       // 中等复杂度（平衡性能和精度）
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  
+  hands.onResults(onHandResults);
+  
+  return true;
+}
+
+function onHandResults(results) {
+  const handStatus = document.getElementById('handStatus');
+  const handX = document.getElementById('handX');
+  const handY = document.getElementById('handY');
+  const handState = document.getElementById('handState');
+  
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    // 获取最靠近的手（第一个，因为 maxNumHands=1）
+    const landmarks = results.multiHandLandmarks[0];
+    
+    // 使用手腕 (index 0) 作为手的位置
+    // MediaPipe 坐标系: x[0-1] 左到右, y[0-1] 上到下
+    // 需要映射到屏幕坐标，然后转换到世界坐标
+    const wrist = landmarks[0];
+    const indexTip = landmarks[8];
+    const thumbTip = landmarks[4];
+    
+    // 镜像 X 坐标（摄像头是镜像的）
+    const screenX = (1 - wrist.x) * window.innerWidth;
+    const screenY = wrist.y * window.innerHeight;
+    
+    // 转换到世界坐标
+    const worldPos = screenToWorld(screenX, screenY);
+    handTracking.x = worldPos.x;
+    handTracking.y = worldPos.y;
+    handTracking.isDetected = true;
+    
+    // 检测捏合手势（拇指和食指距离）
+    const pinchDist = Math.sqrt(
+      Math.pow(indexTip.x - thumbTip.x, 2) + 
+      Math.pow(indexTip.y - thumbTip.y, 2)
+    );
+    handTracking.isPinching = pinchDist < 0.05;  // 阈值可调
+    handTracking.isOpen = pinchDist > 0.15;      // 张开阈值
+    
+    // 更新 UI 显示
+    if (handX) handX.textContent = screenX.toFixed(0);
+    if (handY) handY.textContent = screenY.toFixed(0);
+    if (handState) {
+      let state = 'Detected';
+      if (handTracking.isPinching) state += ' | Pinch';
+      else if (handTracking.isOpen) state += ' | Open';
+      handState.textContent = state;
+      handState.style.color = '#0ff';
+    }
+  } else {
+    // 没有检测到手
+    handTracking.isDetected = false;
+    handTracking.isPinching = false;
+    handTracking.isOpen = false;
+    
+    if (handState) {
+      handState.textContent = 'Waiting for hand...';
+      handState.style.color = '#888';
+    }
+    if (handX) handX.textContent = '--';
+    if (handY) handY.textContent = '--';
+  }
+}
+
+async function startCamera() {
+  const cameraToggle = document.getElementById('cameraToggle');
+  const handStatus = document.getElementById('handStatus');
+  
+  if (!initHandTracking()) {
+    cameraToggle.checked = false;
+    return;
+  }
+  
+  try {
+    // 创建隐藏的视频元素
+    const videoElement = document.createElement('video');
+    videoElement.style.display = 'none';
+    document.body.appendChild(videoElement);
+    
+    // 使用 CameraUtils 启动摄像头
+    const Camera = window.Camera;
+    if (!Camera) {
+      throw new Error('Camera utils not loaded');
+    }
+    
+    cameraUtils = new Camera(videoElement, {
+      onFrame: async () => {
+        if (hands && isCameraActive) {
+          await hands.send({ image: videoElement });
+        }
+      },
+      width: 640,
+      height: 480
+    });
+    
+    await cameraUtils.start();
+    isCameraActive = true;
+    
+    // 显示手坐标面板
+    if (handStatus) handStatus.style.display = 'block';
+    
+    console.log('Camera started');
+  } catch (error) {
+    console.error('Camera error:', error);
+    showCameraError('无法启动摄像头: ' + error.message);
+    cameraToggle.checked = false;
+    isCameraActive = false;
+  }
+}
+
+function stopCamera() {
+  const handStatus = document.getElementById('handStatus');
+  const handX = document.getElementById('handX');
+  const handY = document.getElementById('handY');
+  const handState = document.getElementById('handState');
+  
+  isCameraActive = false;
+  handTracking.isDetected = false;
+  handTracking.isPinching = false;
+  handTracking.isOpen = false;
+  
+  if (cameraUtils) {
+    cameraUtils.stop();
+    cameraUtils = null;
+  }
+  
+  // 隐藏手坐标面板
+  if (handStatus) handStatus.style.display = 'none';
+  if (handX) handX.textContent = '--';
+  if (handY) handY.textContent = '--';
+  if (handState) {
+    handState.textContent = 'Waiting for hand...';
+    handState.style.color = '#888';
+  }
+  
+  console.log('Camera stopped');
+}
+
+function showCameraError(message) {
+  const errorEl = document.getElementById('cameraError');
+  if (errorEl) {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    setTimeout(() => {
+      errorEl.style.display = 'none';
+    }, 5000);
   }
 }

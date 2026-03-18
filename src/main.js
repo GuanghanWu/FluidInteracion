@@ -773,9 +773,9 @@ function initHandTracking() {
   
   hands.setOptions({
     maxNumHands: 1,           // 只识别最靠近的一只手
-    modelComplexity: 1,       // 中等复杂度（平衡性能和精度）
-    minDetectionConfidence: 0.3,  // 降低检测阈值，提高灵敏度
-    minTrackingConfidence: 0.3
+    modelComplexity: 0,       // 轻量级模型，提高检测速度
+    minDetectionConfidence: 0.1,  // 进一步降低阈值
+    minTrackingConfidence: 0.1
   });
   
   hands.onResults(onHandResults);
@@ -797,8 +797,15 @@ function onHandResults(results) {
   handFrameCount++;
   if (handFrameCount % 30 === 0) {
     const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-    console.log(`[INFO] Hand detection: ${count} hand(s)`);
+    const image = results.image;
+    console.log(`[INFO] Hand detection: ${count} hand(s), image: ${image ? image.width + 'x' + image.height : 'null'}`);
     debugLog('info', `Hand detection: ${count} hand(s)`);
+  }
+  
+  // 每次检测都打印（调试用）
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    console.log('[INFO] Hand DETECTED!');
+    debugLog('info', 'Hand DETECTED!');
   }
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {

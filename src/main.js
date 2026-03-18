@@ -797,19 +797,12 @@ function initHandTracking() {
   
   hands.onResults(onHandResults);
   
-  // 等待模型加载完成
-  hands.initialize().then(() => {
-    console.log('[INFO] MediaPipe Hands model loaded');
-    debugLog('info', 'Hands model loaded');
-    isHandsLoading = false;
-  }).catch(err => {
-    console.error('[ERROR] Hands model failed:', err);
-    debugLog('error', 'Hands model failed: ' + err.message);
-    isHandsLoading = false;
-  });
+  // MediaPipe 模型是惰性加载的，第一次 send 时才会加载
+  // 不需要显式 initialize，直接标记为就绪
+  isHandsLoading = false;
   
-  console.log('[INFO] MediaPipe Hands initializing...');
-  debugLog('info', 'Hands initializing...');
+  console.log('[INFO] MediaPipe Hands initialized');
+  debugLog('info', 'Hands initialized');
   return true;
 }
 
@@ -928,28 +921,30 @@ async function startCamera() {
       handState.style.color = '#0ff';
     }
     
-    // 视频调试 - 每3帧处理一次，降低CPU负担
+    // 视频调试 - 每帧处理（确保检测率）
     let frameCount = 0;
+    let lastLogTime = 0;
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
-        if (hands && isCameraActive && videoElement.readyState >= 2 && !isHandsLoading) {
+        if (hands && isCameraActive && videoElement.readyState >= 2) {
           try {
             frameCount++;
-            // 每3帧处理一次
-            if (frameCount % 3 === 0) {
-              await hands.send({ image: videoElement });
-            }
-            // 每180帧打印一次状态
-            if (frameCount % 180 === 0) {
-              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight, 'modelReady:', !isHandsLoading);
+            // 每帧都发送，确保最大检测率
+            await hands.send({ image: videoElement });
+            
+            // 每秒打印一次状态
+            const now = Date.now();
+            if (now - lastLogTime > 1000) {
+              lastLogTime = now;
+              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight, 'frames:', frameCount);
             }
           } catch (e) {
             console.error('[ERROR] Hands send error:', e);
           }
         }
       },
-      width: 320,
-      height: 240
+      width: 640,  // 恢复更高分辨率，提高检测精度
+      height: 480
     });
     
     await cameraUtils.start();

@@ -28,6 +28,11 @@ function debugLog(level, message, data) {
   if (!debugSystem.enabled) return;
   if (!debugSystem.levels[level]) return;
   
+  // 测试用
+  if (level === 'warning' && message === 'test') {
+    message = '测试用<br>测试用行二';
+  }
+  
   const colors = { info: '#0ff', warning: '#ff0', error: '#f66' };
   const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const logEntry = document.createElement('div');
@@ -86,6 +91,10 @@ const PARTICLE_QUAD_SIZE = 0.15;
 try {
   init();
   animate();
+  // 测试日志显示
+  setTimeout(() => {
+    debugLog('warning', 'test');
+  }, 1000);
 } catch (error) {
   console.error('Initialization error:', error);
   document.getElementById('info').innerHTML = `<div style="color: red;">错误：${error.message}</div>`;

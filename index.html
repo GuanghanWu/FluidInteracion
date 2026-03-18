@@ -269,12 +269,12 @@
     <div id="panelContent">
     <!-- 基础参数 -->
     <div class="control-group">
-      <label>Density: <span id="densityVal">1.0x</span></label>
-      <input type="range" id="density" min="0.5" max="5.0" value="1.0" step="0.1" title="Max 5x ≈ 1500 particles">
+      <label>Density: <span id="densityVal">2.6x</span></label>
+      <input type="range" id="density" min="0.5" max="5.0" value="2.6" step="0.1" title="Max 5x ≈ 1500 particles">
     </div>
     <div class="control-group">
-      <label>Particle Size: <span id="radiusVal">1.0</span></label>
-      <input type="range" id="radiusScale" min="0.3" max="4.0" value="1.0" step="0.1">
+      <label>Particle Size: <span id="radiusVal">1.4</span></label>
+      <input type="range" id="radiusScale" min="0.3" max="4.0" value="1.4" step="0.1">
     </div>
     
     <!-- 物理参数折叠页 -->
@@ -282,12 +282,12 @@
       <div class="accordion-header collapsed" data-accordion="physics">Physics</div>
       <div class="accordion-content collapsed" id="physics">
         <div class="control-group">
-          <label>Viscosity: <span id="viscosityVal">0.15</span></label>
-          <input type="range" id="viscosity" min="0" max="0.5" value="0.15" step="0.05">
+          <label>Viscosity: <span id="viscosityVal">0.25</span></label>
+          <input type="range" id="viscosity" min="0" max="0.5" value="0.25" step="0.05">
         </div>
         <div class="control-group">
-          <label>Mouse Force: <span id="mouseForceVal">2.0</span></label>
-          <input type="range" id="mouseForce" min="0" max="5" value="2" step="0.5">
+          <label>Mouse Force: <span id="mouseForceVal">4.0</span></label>
+          <input type="range" id="mouseForce" min="0" max="5" value="4.0" step="0.5">
         </div>
       </div>
     </div>
@@ -302,8 +302,8 @@
           <div class="sub-header collapsed" data-sub="colors">Colors</div>
           <div class="sub-content collapsed" id="colors">
             <div class="sub-control">
-              <label>Layers: <span id="colorLayersVal">3</span></label>
-              <input type="range" id="colorLayers" min="1" max="4" value="3" step="1">
+              <label>Layers: <span id="colorLayersVal">4</span></label>
+              <input type="range" id="colorLayers" min="1" max="4" value="4" step="1">
             </div>
             <div class="color-grid">
               <div class="color-dot" id="color1Dot" style="background: #66ffff;" title="Color 1 (Edge)"></div>
@@ -327,18 +327,18 @@
               <label>Algorithm</label>
               <select id="randomAlgo">
                 <option value="none">None</option>
-                <option value="perlin">Perlin Noise</option>
+                <option value="perlin" selected>Perlin Noise</option>
                 <option value="simplex">Simplex Noise</option>
                 <option value="white">White Noise</option>
               </select>
             </div>
             <div class="sub-control">
-              <label>Scale: <span id="randomScaleVal">1.0</span></label>
-              <input type="range" id="randomScale" min="0.1" max="3.0" value="1.0" step="0.1">
+              <label>Scale: <span id="randomScaleVal">1.4</span></label>
+              <input type="range" id="randomScale" min="0.1" max="3.0" value="1.4" step="0.1">
             </div>
             <div class="sub-control">
-              <label>Intensity: <span id="randomIntensityVal">0.3</span></label>
-              <input type="range" id="randomIntensity" min="0" max="1.0" value="0.3" step="0.05">
+              <label>Intensity: <span id="randomIntensityVal">0.70</span></label>
+              <input type="range" id="randomIntensity" min="0" max="1.0" value="0.70" step="0.05">
             </div>
           </div>
         </div>
@@ -362,11 +362,11 @@
       <div class="accordion-header collapsed" data-accordion="profile">Profile</div>
       <div class="accordion-content collapsed" id="profile">
         <div class="control-group">
-          <label>FPS Limit: <span id="fpsLimitVal">120</span></label>
+          <label>FPS Limit: <span id="fpsLimitVal">60</span></label>
           <select id="fpsLimit" style="width: 100%; padding: 5px; background: rgba(0,0,0,0.5); color: #0ff; border: 1px solid #0ff; border-radius: 4px;">
             <option value="30">30 FPS</option>
-            <option value="60">60 FPS</option>
-            <option value="120" selected>120 FPS</option>
+            <option value="60" selected>60 FPS</option>
+            <option value="120">120 FPS</option>
           </select>
         </div>
       </div>

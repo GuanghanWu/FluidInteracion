@@ -8,25 +8,25 @@ import { SPHSolver } from './core/SPHSolver.js';
 
 // 配置
 let CONFIG = {
-  density: 1.0,
+  density: 2.6,
   baseParticleCount: 300,
   particleRadius: 0.08,
   gravity: { x: 0, y: 0 },
-  viscosity: 0.15,
-  mouseForce: 2.0,
+  viscosity: 0.25,
+  mouseForce: 4.0,
   mouseRadius: 1.0,
   textureSize: 512,
   edgeSoftness: 0.5,
-  colorLayers: 3,
+  colorLayers: 4,
   color1: '#66ffff',
   color2: '#00ccff',
   color3: '#0088cc',
   color4: '#001133',
   activeColorIndex: 1,
-  randomAlgo: 'none',
-  randomScale: 1.0,
-  randomIntensity: 0.3,
-  fpsLimit: 120
+  randomAlgo: 'perlin',
+  randomScale: 1.4,
+  randomIntensity: 0.70,
+  fpsLimit: 60
 };
 
 let scene, camera, renderer;
@@ -121,7 +121,7 @@ function init() {
     gravity: CONFIG.gravity,
     restDensity: 1.0,
     gasConstant: 0.2,
-    viscosity: 0.15,
+    viscosity: 0.25,
     dt: 0.005,
     bounds: { minX: -aspect * 0.95, minY: -0.95, maxX: aspect * 0.95, maxY: 0.95 }
   });

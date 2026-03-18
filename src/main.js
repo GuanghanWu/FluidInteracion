@@ -840,12 +840,19 @@ function onHandResults(results) {
     const indexTip = landmarks[8];
     const thumbTip = landmarks[4];
     
-    // 镜像 X 坐标（摄像头是镜像的）
-    const screenX = (1 - wrist.x) * window.innerWidth;
-    const screenY = wrist.y * window.innerHeight;
+    // MediaPipe 坐标: x[0-1]左到右, y[0-1]上到下
+    // 直接映射到 Three.js 世界坐标 (归一化设备坐标 NDC)
+    // x: -aspect ~ aspect, y: -1 ~ 1
+    const aspect = window.innerWidth / window.innerHeight;
+    const ndcX = (1 - wrist.x) * 2 - 1;  // 镜像并转为 -1~1
+    const ndcY = -(wrist.y * 2 - 1);      // 转为 -1~1 并翻转Y
     
-    // 转换到世界坐标
-    const worldPos = screenToWorld(screenX, screenY);
+    const worldPos = {
+      x: ndcX * aspect,
+      y: ndcY
+    };
+    handTracking.x = worldPos.x;
+    handTracking.y = worldPos.y;
     handTracking.x = worldPos.x;
     handTracking.y = worldPos.y;
     handTracking.isDetected = true;

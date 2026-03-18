@@ -33,11 +33,11 @@ function debugLog(level, message, data) {
     message = '测试用<br>测试用行二';
   }
   
-  const colors = { info: '#0ff', warning: '#ff0', error: '#f66' };
+  const colors = { info: '#00ffff', warning: '#ffff00', error: '#ff6666' };
   const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const logEntry = document.createElement('div');
-  logEntry.style.cssText = `margin-bottom: 4px; padding: 2px 0; border-bottom: 1px solid rgba(0,255,255,0.1);`;
-  logEntry.innerHTML = `<span style="color: #666;">[${time}]</span> <span style="color: ${colors[level]};">${level.toUpperCase()}</span>: ${message}`;
+  logEntry.style.cssText = `margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.2); color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.8);`;
+  logEntry.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${colors[level]}; font-weight: bold;">${level.toUpperCase()}</span>: <span style="color: #fff;">${message}</span>`;
   
   const logContent = document.getElementById('debugLogContent');
   if (logContent) {
@@ -98,8 +98,8 @@ try {
     const logContent = document.getElementById('debugLogContent');
     if (logContent) {
       const testEntry = document.createElement('div');
-      testEntry.innerHTML = '<span style="color: #666;">[TEST]</span> <span style="color: #ff0;">WARNING</span>: 测试用<br>测试用行二';
-      testEntry.style.cssText = 'margin-bottom: 4px; padding: 2px 0; border-bottom: 1px solid rgba(0,255,255,0.1);';
+      testEntry.innerHTML = '<span style="color: #888;">[TEST]</span> <span style="color: #ffff00; font-weight: bold;">WARNING</span>: <span style="color: #fff;">测试用<br>测试用行二</span>';
+      testEntry.style.cssText = 'margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.2); color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.8);';
       logContent.appendChild(testEntry);
     }
   }, 1000);

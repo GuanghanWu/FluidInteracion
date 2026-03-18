@@ -1,48 +1,40 @@
 // MediaPipe GestureRecognizer 手势追踪
-// 使用动态 import 确保加载完成
+// 使用 script 标签加载的 MediaPipe
 
 let gestureRecognizer = null;
 let isGestureLoading = false;
 let lastVideoTime = -1;
-let GestureRecognizer = null;
-let FilesetResolver = null;
 
-export async function loadMediaPipe() {
-  if (GestureRecognizer && FilesetResolver) return true;
-  
-  // 尝试多个 CDN 源
-  const cdnUrls = [
-    'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/+esm',
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm',
-    'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm'
-  ];
-  
-  for (const url of cdnUrls) {
-    try {
-      console.log('[Gesture] Trying CDN:', url);
-      const module = await import(url);
-      GestureRecognizer = module.GestureRecognizer;
-      FilesetResolver = module.FilesetResolver;
-      
-      if (GestureRecognizer && FilesetResolver) {
-        console.log('[Gesture] Module loaded from:', url);
-        return true;
+function waitForMediaPipe() {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const maxAttempts = 50; // 5秒超时
+    
+    function check() {
+      if (window.GestureRecognizer && window.FilesetResolver) {
+        resolve({
+          GestureRecognizer: window.GestureRecognizer,
+          FilesetResolver: window.FilesetResolver
+        });
+        return;
       }
-    } catch (err) {
-      console.log('[Gesture] CDN failed:', url, err.message);
+      
+      attempts++;
+      if (attempts >= maxAttempts) {
+        reject(new Error('MediaPipe loading timeout'));
+        return;
+      }
+      
+      setTimeout(check, 100);
     }
-  }
-  
-  throw new Error('All CDN sources failed');
+    
+    check();
+  });
 }
 
 export async function initGestureRecognizer() {
-  if (gestureRecognizer) {
-    console.log('[Gesture] Already initialized');
-    return true;
-  }
+  if (gestureRecognizer) return true;
   if (isGestureLoading) {
-    console.log('[Gesture] Still loading...');
     // 等待当前加载完成
     while (isGestureLoading) {
       await new Promise(r => setTimeout(r, 100));
@@ -51,18 +43,14 @@ export async function initGestureRecognizer() {
   }
   
   isGestureLoading = true;
-  console.log('[Gesture] Initializing...');
   
   try {
-    await loadMediaPipe();
-    
-    if (!GestureRecognizer || !FilesetResolver) {
-      throw new Error('MediaPipe Tasks Vision not available');
-    }
+    console.log('[Gesture] Waiting for MediaPipe...');
+    const { GestureRecognizer, FilesetResolver } = await waitForMediaPipe();
     
     console.log('[Gesture] Creating vision tasks...');
     const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+      'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
     );
     
     console.log('[Gesture] Loading model...');
@@ -79,7 +67,6 @@ export async function initGestureRecognizer() {
     return true;
   } catch (err) {
     console.error('[Gesture] Init failed:', err);
-    // 出错时重置状态，允许重试
     gestureRecognizer = null;
     throw err;
   } finally {

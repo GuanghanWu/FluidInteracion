@@ -752,17 +752,21 @@ function animate() {
 function initHandTracking() {
   // 检查 MediaPipe 是否加载
   if (!window.Hands) {
+    console.error('[ERROR] MediaPipe Hands not loaded');
     debugLog('error', 'MediaPipe Hands not loaded');
     showCameraError('MediaPipe Hands 加载失败，请检查网络连接');
     return false;
   }
+  
+  console.log('[INFO] MediaPipe Hands found, initializing...');
   
   // 初始化 Hands
   hands = new window.Hands({
     locateFile: (file) => {
       // MediaPipe 需要从 CDN 加载模型文件
       const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-      debugLog('info', `Loading MediaPipe file: ${file}`);
+      console.log('[INFO] Loading MediaPipe file:', file);
+      debugLog('info', `Loading: ${file}`);
       return url;
     }
   });
@@ -776,6 +780,7 @@ function initHandTracking() {
   
   hands.onResults(onHandResults);
   
+  console.log('[INFO] MediaPipe Hands initialized successfully');
   debugLog('info', 'MediaPipe Hands initialized');
   return true;
 }
@@ -792,6 +797,7 @@ function onHandResults(results) {
   handFrameCount++;
   if (handFrameCount % 30 === 0) {
     const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+    console.log(`[INFO] Hand detection: ${count} hand(s)`);
     debugLog('info', `Hand detection: ${count} hand(s)`);
   }
   
@@ -904,8 +910,10 @@ async function startCamera() {
       handState.style.color = '#888';
     }
     
+    console.log('[INFO] Camera started successfully');
     debugLog('info', 'Camera started successfully');
   } catch (error) {
+    console.error('[ERROR] Camera failed:', error.message);
     debugLog('error', `Camera failed: ${error.message}`);
     showCameraError('无法启动摄像头: ' + error.message);
     cameraToggle.checked = false;

@@ -18,6 +18,32 @@ let handTracking = {
   isOpen: false
 };
 
+// Debug 系统
+let debugSystem = {
+  enabled: false,
+  levels: { info: false, warning: false, error: true }
+};
+
+function debugLog(level, message, data) {
+  if (!debugSystem.enabled) return;
+  if (!debugSystem.levels[level]) return;
+  
+  const colors = { info: '#0ff', warning: '#ff0', error: '#f66' };
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const logEntry = document.createElement('div');
+  logEntry.style.cssText = `margin-bottom: 4px; padding: 2px 0; border-bottom: 1px solid rgba(0,255,255,0.1);`;
+  logEntry.innerHTML = `<span style="color: #666;">[${time}]</span> <span style="color: ${colors[level]};">${level.toUpperCase()}</span>: ${message}`;
+  
+  const logContent = document.getElementById('debugLogContent');
+  if (logContent) {
+    logContent.appendChild(logEntry);
+    logContent.scrollTop = logContent.scrollHeight;
+  }
+  
+  // 同时输出到控制台
+  console.log(`[${level.toUpperCase()}]`, message, data || '');
+}
+
 // 配置
 let CONFIG = {
   density: 2.6,
@@ -543,6 +569,31 @@ function setupControls() {
     }
   });
   
+  // Debug 开关
+  document.getElementById('debugToggle')?.addEventListener('change', (e) => {
+    debugSystem.enabled = e.target.checked;
+    const debugLevels = document.getElementById('debugLevels');
+    const debugLogPanel = document.getElementById('debugLogPanel');
+    if (debugLevels) debugLevels.style.display = e.target.checked ? 'block' : 'none';
+    if (debugLogPanel) debugLogPanel.style.display = e.target.checked ? 'block' : 'none';
+    debugLog('info', `Debug mode ${e.target.checked ? 'enabled' : 'disabled'}`);
+  });
+  
+  // Debug 日志级别
+  ['logInfo', 'logWarning', 'logError'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', (e) => {
+      const level = id.replace('log', '').toLowerCase();
+      debugSystem.levels[level] = e.target.checked;
+      debugLog('info', `Log level ${level}: ${e.target.checked ? 'on' : 'off'}`);
+    });
+  });
+  
+  // 清除日志
+  document.getElementById('clearLog')?.addEventListener('click', () => {
+    const logContent = document.getElementById('debugLogContent');
+    if (logContent) logContent.innerHTML = '';
+  });
+  
   // 主折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
@@ -701,7 +752,7 @@ function animate() {
 function initHandTracking() {
   // 检查 MediaPipe 是否加载
   if (!window.Hands) {
-    console.error('MediaPipe Hands not loaded');
+    debugLog('error', 'MediaPipe Hands not loaded');
     showCameraError('MediaPipe Hands 加载失败，请检查网络连接');
     return false;
   }
@@ -711,7 +762,7 @@ function initHandTracking() {
     locateFile: (file) => {
       // MediaPipe 需要从 CDN 加载模型文件
       const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-      console.log('Loading MediaPipe file:', url);
+      debugLog('info', `Loading MediaPipe file: ${file}`);
       return url;
     }
   });
@@ -725,7 +776,7 @@ function initHandTracking() {
   
   hands.onResults(onHandResults);
   
-  console.log('MediaPipe Hands initialized');
+  debugLog('info', 'MediaPipe Hands initialized');
   return true;
 }
 
@@ -740,7 +791,8 @@ function onHandResults(results) {
   // 调试：每30帧打印一次
   handFrameCount++;
   if (handFrameCount % 30 === 0) {
-    console.log('Hand results:', results.multiHandLandmarks ? results.multiHandLandmarks.length : 0, 'hands detected');
+    const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+    debugLog('info', `Hand detection: ${count} hand(s)`);
   }
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -852,9 +904,9 @@ async function startCamera() {
       handState.style.color = '#888';
     }
     
-    console.log('Camera started successfully');
+    debugLog('info', 'Camera started successfully');
   } catch (error) {
-    console.error('Camera error:', error);
+    debugLog('error', `Camera failed: ${error.message}`);
     showCameraError('无法启动摄像头: ' + error.message);
     cameraToggle.checked = false;
     isCameraActive = false;

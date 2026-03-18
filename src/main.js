@@ -789,18 +789,27 @@ function initHandTracking() {
   hands.setOptions({
     maxNumHands: 1,
     modelComplexity: 1,
-    minDetectionConfidence: 0.5,  // 官方默认值
+    minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5,
     selfieMode: true
   });
   
   hands.onResults(onHandResults);
   
-  // MediaPipe 模型是惰性加载的，第一次 send 时才会加载
-  // 不需要显式 initialize，直接标记为就绪
+  // 捕获模型加载错误
+  hands.setOptions = new Proxy(hands.setOptions, {
+    apply(target, thisArg, args) {
+      try {
+        return target.apply(thisArg, args);
+      } catch (e) {
+        debugLog('error', 'Hands setOptions failed: ' + e.message);
+        throw e;
+      }
+    }
+  });
+  
   isHandsLoading = false;
   
-  console.log('[INFO] MediaPipe Hands initialized');
   debugLog('info', 'Hands initialized');
   return true;
 }
@@ -937,6 +946,7 @@ async function startCamera() {
     // 检测循环
     let frameCount = 0;
     let lastLogTime = 0;
+    let errorCount = 0;
     async function detectLoop() {
       if (!isCameraActive) return;
       
@@ -944,14 +954,21 @@ async function startCamera() {
         try {
           frameCount++;
           await hands.send({ image: videoElement });
+          errorCount = 0;  // 成功时重置错误计数
           
           const now = Date.now();
           if (now - lastLogTime > 1000) {
             lastLogTime = now;
-            console.log('[INFO] Frames processed:', frameCount);
+            debugLog('info', 'Frames: ' + frameCount);
           }
         } catch (e) {
-          console.error('[ERROR] Detection error:', e);
+          errorCount++;
+          if (errorCount <= 3) {  // 只显示前3个错误
+            debugLog('error', 'Detection error: ' + e.message);
+          }
+          if (errorCount === 3) {
+            debugLog('error', 'Too many errors, stopping detection');
+          }
         }
       }
       requestAnimationFrame(detectLoop);

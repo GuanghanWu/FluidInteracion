@@ -709,27 +709,39 @@ function initHandTracking() {
   // 初始化 Hands
   hands = new window.Hands({
     locateFile: (file) => {
-      return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      // MediaPipe 需要从 CDN 加载模型文件
+      const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      console.log('Loading MediaPipe file:', url);
+      return url;
     }
   });
   
   hands.setOptions({
     maxNumHands: 1,           // 只识别最靠近的一只手
     modelComplexity: 1,       // 中等复杂度（平衡性能和精度）
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    minDetectionConfidence: 0.3,  // 降低检测阈值，提高灵敏度
+    minTrackingConfidence: 0.3
   });
   
   hands.onResults(onHandResults);
   
+  console.log('MediaPipe Hands initialized');
   return true;
 }
+
+let handFrameCount = 0;
 
 function onHandResults(results) {
   const handStatus = document.getElementById('handStatus');
   const handX = document.getElementById('handX');
   const handY = document.getElementById('handY');
   const handState = document.getElementById('handState');
+  
+  // 调试：每30帧打印一次
+  handFrameCount++;
+  if (handFrameCount % 30 === 0) {
+    console.log('Hand results:', results.multiHandLandmarks ? results.multiHandLandmarks.length : 0, 'hands detected');
+  }
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     // 获取最靠近的手（第一个，因为 maxNumHands=1）
@@ -789,6 +801,7 @@ async function startCamera() {
   const cameraToggle = document.getElementById('cameraToggle');
   const handStatus = document.getElementById('handStatus');
   const previewControl = document.getElementById('previewControl');
+  const handState = document.getElementById('handState');
   
   if (!initHandTracking()) {
     cameraToggle.checked = false;
@@ -808,10 +821,20 @@ async function startCamera() {
       throw new Error('Camera utils not loaded');
     }
     
+    // 更新状态
+    if (handState) {
+      handState.textContent = 'Starting camera...';
+      handState.style.color = '#0ff';
+    }
+    
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
         if (hands && isCameraActive) {
-          await hands.send({ image: videoElement });
+          try {
+            await hands.send({ image: videoElement });
+          } catch (e) {
+            console.error('Hands send error:', e);
+          }
         }
       },
       width: 640,
@@ -824,13 +847,21 @@ async function startCamera() {
     // 显示手坐标面板和预览控制
     if (handStatus) handStatus.style.display = 'block';
     if (previewControl) previewControl.style.display = 'block';
+    if (handState) {
+      handState.textContent = 'Camera active, waiting for hand...';
+      handState.style.color = '#888';
+    }
     
-    console.log('Camera started');
+    console.log('Camera started successfully');
   } catch (error) {
     console.error('Camera error:', error);
     showCameraError('无法启动摄像头: ' + error.message);
     cameraToggle.checked = false;
     isCameraActive = false;
+    if (handState) {
+      handState.textContent = 'Camera failed: ' + error.message;
+      handState.style.color = '#f66';
+    }
   }
 }
 

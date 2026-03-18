@@ -8,10 +8,11 @@ let lastVideoTime = -1;
 function waitForMediaPipe() {
   return new Promise((resolve, reject) => {
     let attempts = 0;
-    const maxAttempts = 50; // 5秒超时
+    const maxAttempts = 300; // 30秒超时
     
     function check() {
       if (window.GestureRecognizer && window.FilesetResolver) {
+        console.log('[Gesture] MediaPipe loaded after', attempts * 100, 'ms');
         resolve({
           GestureRecognizer: window.GestureRecognizer,
           FilesetResolver: window.FilesetResolver
@@ -21,8 +22,13 @@ function waitForMediaPipe() {
       
       attempts++;
       if (attempts >= maxAttempts) {
-        reject(new Error('MediaPipe loading timeout'));
+        reject(new Error('MediaPipe loading timeout (30s)'));
         return;
+      }
+      
+      // 每5秒输出一次进度
+      if (attempts % 50 === 0) {
+        console.log('[Gesture] Still loading...', attempts * 100, 'ms');
       }
       
       setTimeout(check, 100);

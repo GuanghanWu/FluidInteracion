@@ -91,18 +91,6 @@ const PARTICLE_QUAD_SIZE = 0.15;
 try {
   init();
   animate();
-  // 测试日志显示（不依赖 Debug 开关）
-  setTimeout(() => {
-    console.log('[TEST] This is a test log');
-    // 直接操作 DOM 添加测试日志
-    const logContent = document.getElementById('debugLogContent');
-    if (logContent) {
-      const testEntry = document.createElement('div');
-      testEntry.innerHTML = '<span style="color: #888;">[TEST]</span> <span style="color: #ffff00; font-weight: bold;">WARNING</span>: <span style="color: #fff;">测试用<br>测试用行二</span>';
-      testEntry.style.cssText = 'margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.2); color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.8);';
-      logContent.appendChild(testEntry);
-    }
-  }, 1000);
 } catch (error) {
   console.error('Initialization error:', error);
   document.getElementById('info').innerHTML = `<div style="color: red;">错误：${error.message}</div>`;
@@ -801,9 +789,10 @@ function initHandTracking() {
   
   hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 1,       // 用中等复杂度，轻量级可能不稳定
-    minDetectionConfidence: 0.3,
-    minTrackingConfidence: 0.3
+    modelComplexity: 1,
+    minDetectionConfidence: 0.1,
+    minTrackingConfidence: 0.1,
+    selfieMode: true  // 前置摄像头模式，更适合检测自己的手
   });
   
   hands.onResults(onHandResults);
@@ -832,10 +821,12 @@ function onHandResults(results) {
     debugLog('info', `Hand detection: ${count} hand(s)`);
   }
   
-  // 检测到手时打印
+  // 检测到手时打印详细信息
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    console.log('[INFO] Hand DETECTED! landmarks:', results.multiHandLandmarks[0].length);
-    debugLog('info', 'Hand DETECTED!');
+    const landmarks = results.multiHandLandmarks[0];
+    const wrist = landmarks[0];
+    console.log('[INFO] Hand DETECTED! wrist:', wrist.x.toFixed(2), wrist.y.toFixed(2));
+    debugLog('info', `Hand detected at ${(wrist.x * 100).toFixed(0)}%, ${(wrist.y * 100).toFixed(0)}%`);
   }
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -922,10 +913,18 @@ async function startCamera() {
       handState.style.color = '#0ff';
     }
     
+    // 视频调试
+    let frameDebugCount = 0;
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
         if (hands && isCameraActive && videoElement.readyState >= 2) {
           try {
+            // 每60帧打印一次视频状态
+            frameDebugCount++;
+            if (frameDebugCount % 60 === 0) {
+              console.log('[INFO] Video frame:', videoElement.videoWidth, 'x', videoElement.videoHeight, 
+                'playing:', !videoElement.paused, 'readyState:', videoElement.readyState);
+            }
             await hands.send({ image: videoElement });
           } catch (e) {
             console.error('[ERROR] Hands send error:', e);

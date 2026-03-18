@@ -438,8 +438,41 @@
     </div>
     <div id="debugLogContent" style="padding: 8px 12px; max-height: 40vh; overflow-y: auto;"></div>
   </div>
-  <!-- MediaPipe Tasks Vision -->
-  <script src="https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
+  <!-- MediaPipe Tasks Vision - 多CDN备用 -->
+  <script>
+    // 按顺序尝试多个CDN
+    const cdnUrls = [
+      'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
+      'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
+      'https://cdn.bootcdn.net/ajax/libs/@mediapipe/tasks-vision/0.10.3/vision_bundle.js'
+    ];
+    
+    async function loadMediaPipe() {
+      for (const url of cdnUrls) {
+        try {
+          console.log('[MediaPipe] Trying:', url);
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.crossOrigin = 'anonymous';
+            script.onload = () => {
+              console.log('[MediaPipe] Loaded from:', url);
+              resolve();
+            };
+            script.onerror = () => reject(new Error('Failed to load'));
+            document.head.appendChild(script);
+          });
+          return; // 成功加载
+        } catch (e) {
+          console.log('[MediaPipe] Failed:', url, e.message);
+        }
+      }
+      console.error('[MediaPipe] All CDN failed');
+    }
+    
+    loadMediaPipe();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

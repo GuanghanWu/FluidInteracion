@@ -25,8 +25,18 @@ export async function loadMediaPipe() {
 }
 
 export async function initGestureRecognizer() {
-  if (gestureRecognizer) return true;
-  if (isGestureLoading) return false;
+  if (gestureRecognizer) {
+    console.log('[Gesture] Already initialized');
+    return true;
+  }
+  if (isGestureLoading) {
+    console.log('[Gesture] Still loading...');
+    // 等待当前加载完成
+    while (isGestureLoading) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return !!gestureRecognizer;
+  }
   
   isGestureLoading = true;
   console.log('[Gesture] Initializing...');
@@ -38,10 +48,12 @@ export async function initGestureRecognizer() {
       throw new Error('MediaPipe Tasks Vision not available');
     }
     
+    console.log('[Gesture] Creating vision tasks...');
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
     );
     
+    console.log('[Gesture] Loading model...');
     gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
@@ -52,12 +64,14 @@ export async function initGestureRecognizer() {
     });
     
     console.log('[Gesture] Initialized successfully');
-    isGestureLoading = false;
     return true;
   } catch (err) {
     console.error('[Gesture] Init failed:', err);
-    isGestureLoading = false;
+    // 出错时重置状态，允许重试
+    gestureRecognizer = null;
     throw err;
+  } finally {
+    isGestureLoading = false;
   }
 }
 

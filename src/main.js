@@ -532,6 +532,17 @@ function setupControls() {
     }
   });
   
+  // 预览按钮
+  document.getElementById('previewToggle')?.addEventListener('click', () => {
+    const preview = document.getElementById('cameraPreview');
+    const btn = document.getElementById('previewToggle');
+    if (preview) {
+      const isVisible = preview.style.display !== 'none';
+      preview.style.display = isVisible ? 'none' : 'block';
+      if (btn) btn.textContent = isVisible ? '显示摄像头预览' : '隐藏摄像头预览';
+    }
+  });
+  
   // 主折叠面板
   document.querySelectorAll('.accordion-header').forEach(header => {
     header.addEventListener('click', () => {
@@ -777,6 +788,7 @@ function onHandResults(results) {
 async function startCamera() {
   const cameraToggle = document.getElementById('cameraToggle');
   const handStatus = document.getElementById('handStatus');
+  const previewControl = document.getElementById('previewControl');
   
   if (!initHandTracking()) {
     cameraToggle.checked = false;
@@ -784,10 +796,11 @@ async function startCamera() {
   }
   
   try {
-    // 创建隐藏的视频元素
-    const videoElement = document.createElement('video');
-    videoElement.style.display = 'none';
-    document.body.appendChild(videoElement);
+    // 使用预览视频元素
+    const videoElement = document.getElementById('previewVideo');
+    if (!videoElement) {
+      throw new Error('Preview video element not found');
+    }
     
     // 使用 CameraUtils 启动摄像头
     const Camera = window.Camera;
@@ -808,8 +821,9 @@ async function startCamera() {
     await cameraUtils.start();
     isCameraActive = true;
     
-    // 显示手坐标面板
+    // 显示手坐标面板和预览控制
     if (handStatus) handStatus.style.display = 'block';
+    if (previewControl) previewControl.style.display = 'block';
     
     console.log('Camera started');
   } catch (error) {
@@ -822,6 +836,9 @@ async function startCamera() {
 
 function stopCamera() {
   const handStatus = document.getElementById('handStatus');
+  const previewControl = document.getElementById('previewControl');
+  const cameraPreview = document.getElementById('cameraPreview');
+  const previewToggle = document.getElementById('previewToggle');
   const handX = document.getElementById('handX');
   const handY = document.getElementById('handY');
   const handState = document.getElementById('handState');
@@ -836,8 +853,12 @@ function stopCamera() {
     cameraUtils = null;
   }
   
-  // 隐藏手坐标面板
+  // 隐藏面板和预览
   if (handStatus) handStatus.style.display = 'none';
+  if (previewControl) previewControl.style.display = 'none';
+  if (cameraPreview) cameraPreview.style.display = 'none';
+  if (previewToggle) previewToggle.textContent = '显示摄像头预览';
+  
   if (handX) handX.textContent = '--';
   if (handY) handY.textContent = '--';
   if (handState) {

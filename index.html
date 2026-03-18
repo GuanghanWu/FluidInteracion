@@ -440,6 +440,20 @@
   </div>
   <!-- MediaPipe Tasks Vision - 多CDN备用 -->
   <script>
+    // 日志函数 - 直接操作DOM显示在Debug面板
+    function mpLog(level, msg) {
+      const colors = { info: '#0ff', error: '#f66' };
+      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const logContent = document.getElementById('debugLogContent');
+      if (logContent) {
+        const entry = document.createElement('div');
+        entry.style.cssText = 'margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.2); color: #fff;';
+        entry.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${colors[level]}; font-weight: bold;">${level.toUpperCase()}</span>: ${msg}`;
+        logContent.appendChild(entry);
+      }
+      console.log(`[${level}]`, msg);
+    }
+    
     // 按顺序尝试多个CDN
     const cdnUrls = [
       'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
@@ -449,26 +463,27 @@
     ];
     
     async function loadMediaPipe() {
+      mpLog('info', 'Starting MediaPipe load...');
       for (const url of cdnUrls) {
         try {
-          console.log('[MediaPipe] Trying:', url);
+          mpLog('info', 'Trying CDN: ' + url.split('/')[2]);
           await new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = url;
             script.crossOrigin = 'anonymous';
             script.onload = () => {
-              console.log('[MediaPipe] Loaded from:', url);
+              mpLog('info', 'Loaded from: ' + url.split('/')[2]);
               resolve();
             };
-            script.onerror = () => reject(new Error('Failed to load'));
+            script.onerror = () => reject(new Error('Failed'));
             document.head.appendChild(script);
           });
           return; // 成功加载
         } catch (e) {
-          console.log('[MediaPipe] Failed:', url, e.message);
+          mpLog('error', 'Failed: ' + url.split('/')[2]);
         }
       }
-      console.error('[MediaPipe] All CDN failed');
+      mpLog('error', 'All CDN failed!');
     }
     
     loadMediaPipe();

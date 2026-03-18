@@ -894,11 +894,11 @@ async function startCamera() {
     
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
-        if (hands && isCameraActive) {
+        if (hands && isCameraActive && videoElement.readyState >= 2) {
           try {
             await hands.send({ image: videoElement });
           } catch (e) {
-            console.error('Hands send error:', e);
+            console.error('[ERROR] Hands send error:', e);
           }
         }
       },
@@ -908,6 +908,18 @@ async function startCamera() {
     
     await cameraUtils.start();
     isCameraActive = true;
+    
+    // 等待视频准备好
+    if (videoElement.readyState < 2) {
+      console.log('[INFO] Waiting for video to be ready...');
+      await new Promise(resolve => {
+        videoElement.onloadeddata = () => {
+          console.log('[INFO] Video ready, playing');
+          resolve();
+        };
+      });
+    }
+    console.log('[INFO] Video state:', videoElement.readyState, 'playing:', !videoElement.paused);
     
     // 显示手坐标面板和预览控制
     if (handStatus) handStatus.style.display = 'block';

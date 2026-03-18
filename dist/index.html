@@ -455,12 +455,12 @@
       console.log(`[${level}]`, msg);
     }
     
-    // 按顺序尝试多个CDN
+    // 按顺序尝试多个CDN (正确的文件扩展名是 .mjs)
     const cdnUrls = [
-      'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
-      'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js',
-      'https://cdn.bootcdn.net/ajax/libs/@mediapipe/tasks-vision/0.10.3/vision_bundle.js'
+      'https://unpkg.com/@mediapipe/tasks-vision@0.10.3/+esm',
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs',
+      'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs',
+      'https://cdn.bootcdn.net/ajax/libs/@mediapipe/tasks-vision/0.10.3/vision_bundle.mjs'
     ];
     
     async function loadMediaPipe() {

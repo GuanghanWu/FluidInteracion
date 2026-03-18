@@ -789,10 +789,10 @@ function initHandTracking() {
   
   hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.1,
-    minTrackingConfidence: 0.1,
-    selfieMode: true  // 前置摄像头模式，更适合检测自己的手
+    modelComplexity: 0,  // 轻量级模型，提高性能
+    minDetectionConfidence: 0.3,
+    minTrackingConfidence: 0.3,
+    selfieMode: true
   });
   
   hands.onResults(onHandResults);
@@ -913,26 +913,28 @@ async function startCamera() {
       handState.style.color = '#0ff';
     }
     
-    // 视频调试
-    let frameDebugCount = 0;
+    // 视频调试 - 每3帧处理一次，降低CPU负担
+    let frameCount = 0;
     cameraUtils = new Camera(videoElement, {
       onFrame: async () => {
         if (hands && isCameraActive && videoElement.readyState >= 2) {
           try {
-            // 每60帧打印一次视频状态
-            frameDebugCount++;
-            if (frameDebugCount % 60 === 0) {
-              console.log('[INFO] Video frame:', videoElement.videoWidth, 'x', videoElement.videoHeight, 
-                'playing:', !videoElement.paused, 'readyState:', videoElement.readyState);
+            frameCount++;
+            // 每3帧处理一次（约10-20fps），平衡性能和检测率
+            if (frameCount % 3 === 0) {
+              await hands.send({ image: videoElement });
             }
-            await hands.send({ image: videoElement });
+            // 每180帧（约6秒）打印一次视频状态
+            if (frameCount % 180 === 0) {
+              console.log('[INFO] Video:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+            }
           } catch (e) {
             console.error('[ERROR] Hands send error:', e);
           }
         }
       },
-      width: 640,
-      height: 480
+      width: 320,  // 降低分辨率，提高性能
+      height: 240
     });
     
     await cameraUtils.start();

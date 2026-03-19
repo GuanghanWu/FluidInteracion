@@ -4,7 +4,7 @@
  */
 
 // DOM 元素
-const cameraToggle = document.getElementById('cameraToggle');
+const cameraSwitch = document.getElementById('cameraSwitch');
 const cameraPreview = document.getElementById('cameraPreview');
 const previewVideo = document.getElementById('previewVideo');
 const statusEl = document.getElementById('status');
@@ -20,8 +20,9 @@ let camera = null;
 init();
 
 function init() {
-  cameraToggle.addEventListener('change', (e) => {
-    if (e.target.checked) {
+  cameraSwitch.addEventListener('click', () => {
+    const isActive = cameraSwitch.classList.toggle('active');
+    if (isActive) {
       startCamera();
     } else {
       stopCamera();
@@ -30,7 +31,7 @@ function init() {
 }
 
 async function startCamera() {
-  statusEl.textContent = 'Loading MediaPipe...';
+  statusEl.textContent = 'Loading...';
   statusEl.style.color = '#ff0';
 
   try {
@@ -76,7 +77,7 @@ async function startCamera() {
     statusEl.textContent = 'Error: ' + error.message;
     statusEl.style.color = '#f00';
     console.error(error);
-    cameraToggle.checked = false;
+    cameraSwitch.classList.remove('active');
   }
 }
 

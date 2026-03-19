@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hand Tracking</title>
   <style>
@@ -10,6 +10,7 @@
       background: #000; 
       font-family: monospace;
       transition: background 0.1s;
+      overflow: hidden;
     }
     #container {
       position: absolute;
@@ -21,6 +22,7 @@
       padding: 10px;
       color: #0ff;
       max-width: 300px;
+      z-index: 10;
     }
     button {
       background: #0ff;
@@ -38,7 +40,7 @@
       border: 1px solid #0ff;
       display: none;
       margin-top: 10px;
-      transform: scaleX(-1); /* 镜像 */
+      transform: scaleX(-1);
     }
     #log {
       margin-top: 10px;
@@ -46,7 +48,7 @@
       border-top: 1px solid #0ff;
       font-size: 11px;
       color: #fff;
-      max-height: 200px;
+      max-height: 150px;
       overflow-y: auto;
     }
     #handInfo {
@@ -59,6 +61,7 @@
       left: 10px;
       color: #0ff;
       font-size: 12px;
+      z-index: 10;
     }
   </style>
 </head>
@@ -67,28 +70,24 @@
     <button id="startBtn">START CAMERA</button>
     <div>Status: <span id="status">Off</span></div>
     <div id="handInfo">No hand</div>
-    <video id="video" playsinline></video>
+    <video id="video" playsinline muted></video>
     <div id="log"></div>
   </div>
-  <div id="version">v0.52-fix - All-in-One</div>
+  <div id="version">v0.53 - requestAnimationFrame</div>
 
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   
-  <!-- All code inline -->
   <script>
     (function() {
-      const videoElement = document.getElementById('video');
+      const video = document.getElementById('video');
       const startBtn = document.getElementById('startBtn');
       const statusEl = document.getElementById('status');
       const handInfo = document.getElementById('handInfo');
       const logEl = document.getElementById('log');
 
-      let hands;
-      let camera;
+      let hands = null;
+      let isRunning = false;
+      let rafId = null;
 
       function log(msg) {
         const div = document.createElement('div');
@@ -99,130 +98,108 @@
         console.log(msg);
       }
 
-      // Check libraries
-      log('Checking libraries...');
-      if (typeof Hands === 'undefined') {
-        log('ERROR: Hands not loaded');
-      } else {
-        log('Hands OK');
-      }
-      if (typeof Camera === 'undefined') {
-        log('ERROR: Camera not loaded');
-      } else {
-        log('Camera OK');
+      // Setup camera
+      async function setupCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240 },
+          audio: false
+        });
+        video.srcObject = stream;
+        return new Promise((resolve) => {
+          video.onloadedmetadata = () => resolve(video);
+        });
       }
 
-      let frameCount = 0;
-      let lastHandTime = 0;
-      
+      // On results
       function onResults(results) {
-        frameCount++;
-        
-        // 检查是否有手
-        const hasHand = results.multiHandLandmarks && 
-                        Array.isArray(results.multiHandLandmarks) && 
-                        results.multiHandLandmarks.length > 0;
-        
-        // 每30帧记录一次
-        if (frameCount % 30 === 0) {
-          const handCount = hasHand ? results.multiHandLandmarks.length : 0;
-          log(`Frame ${frameCount}: ${handCount} hand(s)`);
-        }
-        
-        if (hasHand) {
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           const landmarks = results.multiHandLandmarks[0];
-          if (landmarks && landmarks[0]) {
-            const wrist = landmarks[0];
-            const x = Math.round(wrist.x * 100);
-            const y = Math.round(wrist.y * 100);
-            
-            handInfo.textContent = `Hand: ${x}%, ${y}%`;
-            lastHandTime = Date.now();
-            
-            const r = Math.round(wrist.x * 255);
-            const g = Math.round((1 - wrist.y) * 128);
-            const b = Math.round((1 - wrist.x) * 255);
-            document.body.style.background = `rgb(${r},${g},${b})`;
-            
-            if (frameCount % 30 === 0) {
-              log(`Detected at ${x}%, ${y}%`);
-            }
-          }
+          const wrist = landmarks[0];
+          const x = Math.round(wrist.x * 100);
+          const y = Math.round(wrist.y * 100);
+          
+          handInfo.textContent = `Hand: ${x}%, ${y}%`;
+          
+          const r = Math.round(wrist.x * 255);
+          const g = Math.round((1 - wrist.y) * 128);
+          const b = Math.round((1 - wrist.x) * 255);
+          document.body.style.background = `rgb(${r},${g},${b})`;
         } else {
-          // 只有在超过500ms没检测到手才显示"No hand"
-          if (Date.now() - lastHandTime > 500) {
-            handInfo.textContent = 'No hand';
-            document.body.style.background = '#000';
-          }
+          handInfo.textContent = 'No hand';
+          document.body.style.background = '#000';
         }
       }
 
+      // Render loop
+      async function render() {
+        if (!isRunning) return;
+        
+        if (video.readyState >= 2) {
+          await hands.send({ image: video });
+        }
+        
+        rafId = requestAnimationFrame(render);
+      }
+
+      // Start/Stop
       startBtn.addEventListener('click', async () => {
-        if (!camera) {
-          log('START clicked');
-          
-          if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-            log('ERROR: Libraries not ready');
-            return;
-          }
+        if (!isRunning) {
+          log('Starting...');
           
           try {
-            hands = new Hands({locateFile: (file) => {
-              return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-            }});
+            // Setup camera
+            await setupCamera();
+            video.play();
+            video.style.display = 'block';
+            log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
+
+            // Init hands
+            hands = new Hands({
+              locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
             
             hands.setOptions({
               maxNumHands: 1,
-              modelComplexity: 0,  // 轻量级
-              minDetectionConfidence: 0.3,  // 降低阈值
-              minTrackingConfidence: 0.3
+              modelComplexity: 1,
+              minDetectionConfidence: 0.5,
+              minTrackingConfidence: 0.5
             });
             
             hands.onResults(onResults);
             
-            log('Creating camera...');
-            camera = new Camera(videoElement, {
-              onFrame: async () => {
-                await hands.send({image: videoElement});
-              },
-              width: 320,
-              height: 240
-            });
-            
-            log('Starting...');
-            await camera.start();
-            
-            // 检查视频尺寸
-            log(`Video: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
-            
+            isRunning = true;
             statusEl.textContent = 'Running';
             statusEl.style.color = '#0f0';
-            videoElement.style.display = 'block';
             startBtn.textContent = 'STOP';
-            log('Started!');
+            
+            // Start render loop
+            render();
+            log('Started! Show your hand');
             
           } catch (err) {
             log('ERROR: ' + err.message);
-            console.error(err);
             statusEl.textContent = 'Error';
             statusEl.style.color = '#f00';
           }
         } else {
-          log('STOP clicked');
-          camera.stop();
-          hands.close();
-          camera = null;
+          log('Stopping...');
+          isRunning = false;
+          if (rafId) cancelAnimationFrame(rafId);
+          if (video.srcObject) {
+            video.srcObject.getTracks().forEach(t => t.stop());
+            video.srcObject = null;
+          }
           hands = null;
+          video.style.display = 'none';
           statusEl.textContent = 'Off';
           statusEl.style.color = '#fff';
-          videoElement.style.display = 'none';
           startBtn.textContent = 'START CAMERA';
           handInfo.textContent = 'No hand';
           document.body.style.background = '#000';
           log('Stopped');
         }
       });
-      
+
       log('Ready - Click START CAMERA');
     })();
   </script>

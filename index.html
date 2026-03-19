@@ -38,6 +38,7 @@
       border: 1px solid #0ff;
       display: none;
       margin-top: 10px;
+      transform: scaleX(-1); /* 镜像 */
     }
     #log {
       margin-top: 10px;
@@ -112,35 +113,47 @@
       }
 
       let frameCount = 0;
+      let lastHandTime = 0;
       
       function onResults(results) {
         frameCount++;
         
+        // 检查是否有手
+        const hasHand = results.multiHandLandmarks && 
+                        Array.isArray(results.multiHandLandmarks) && 
+                        results.multiHandLandmarks.length > 0;
+        
         // 每30帧记录一次
         if (frameCount % 30 === 0) {
-          const handCount = results.multiHandLandmarks?.length || 0;
+          const handCount = hasHand ? results.multiHandLandmarks.length : 0;
           log(`Frame ${frameCount}: ${handCount} hand(s)`);
         }
         
-        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        if (hasHand) {
           const landmarks = results.multiHandLandmarks[0];
-          const wrist = landmarks[0];
-          const x = Math.round(wrist.x * 100);
-          const y = Math.round(wrist.y * 100);
-          
-          handInfo.textContent = `Hand: ${x}%, ${y}%`;
-          
-          const r = Math.round(wrist.x * 255);
-          const g = Math.round((1 - wrist.y) * 128);
-          const b = Math.round((1 - wrist.x) * 255);
-          document.body.style.background = `rgb(${r},${g},${b})`;
-          
-          if (frameCount % 30 === 0) {
-            log(`Detected at ${x}%, ${y}%`);
+          if (landmarks && landmarks[0]) {
+            const wrist = landmarks[0];
+            const x = Math.round(wrist.x * 100);
+            const y = Math.round(wrist.y * 100);
+            
+            handInfo.textContent = `Hand: ${x}%, ${y}%`;
+            lastHandTime = Date.now();
+            
+            const r = Math.round(wrist.x * 255);
+            const g = Math.round((1 - wrist.y) * 128);
+            const b = Math.round((1 - wrist.x) * 255);
+            document.body.style.background = `rgb(${r},${g},${b})`;
+            
+            if (frameCount % 30 === 0) {
+              log(`Detected at ${x}%, ${y}%`);
+            }
           }
         } else {
-          handInfo.textContent = 'No hand';
-          document.body.style.background = '#000';
+          // 只有在超过500ms没检测到手才显示"No hand"
+          if (Date.now() - lastHandTime > 500) {
+            handInfo.textContent = 'No hand';
+            document.body.style.background = '#000';
+          }
         }
       }
 

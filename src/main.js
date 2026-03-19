@@ -801,16 +801,18 @@ async function startCamera() {
     
     // 检测循环
     let detectFrameCount = 0;
+    console.log('[Camera] detectLoop defined, about to start...');
+    
     function detectLoop() {
+      // 无条件日志 - 确保每次都被记录
+      console.log('[Camera] detectLoop called, isCameraActive:', isCameraActive, 'readyState:', videoElement?.readyState);
+      
       if (!isCameraActive) {
         console.log('[Camera] detectLoop stopped - isCameraActive is false');
         return;
       }
       
       detectFrameCount++;
-      if (detectFrameCount % 60 === 0) {
-        console.log('[Camera] detectLoop running, readyState:', videoElement.readyState);
-      }
       
       if (videoElement.readyState >= 2) {
         if (detectFrameCount % 60 === 0) {

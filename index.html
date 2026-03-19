@@ -1,151 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Hand Tracker</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hand Tracking</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      overflow: hidden;
-      background: #000;
-      transition: background 0.1s ease;
+    body { 
+      margin: 0; 
+      background: #000; 
+      font-family: monospace;
+      transition: background 0.1s;
     }
-    #controls {
+    #container {
       position: absolute;
       top: 10px;
       left: 10px;
-      color: #0ff;
-      font-family: monospace;
-      font-size: 14px;
       background: rgba(0,10,20,0.9);
-      padding: 15px;
-      border-radius: 8px;
       border: 1px solid #0ff;
-      z-index: 100;
-      max-width: 250px;
+      border-radius: 8px;
+      padding: 10px;
+      color: #0ff;
+      max-width: 300px;
     }
-    /* Toggle Switch */
-    .toggle-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    button {
+      background: #0ff;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-weight: bold;
+      cursor: pointer;
       margin-bottom: 10px;
     }
-    .toggle-switch {
-      position: relative;
-      width: 50px;
-      height: 26px;
-      background: #333;
-      border-radius: 13px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-    .toggle-switch.active {
-      background: #0f0;
-    }
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 20px;
-      height: 20px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.3s;
-    }
-    .toggle-switch.active::after {
-      transform: translateX(24px);
-    }
-    .toggle-label {
-      font-weight: bold;
-    }
-    #info {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #0ff;
-      color: #fff;
-      font-size: 12px;
-    }
-    #info div {
-      margin-bottom: 3px;
-    }
-    /* Debug Log */
-    #debugLog {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #0ff;
-    }
-    #debugLogHeader {
-      font-size: 11px;
-      color: #0ff;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    #debugLogContent {
-      max-height: 150px;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.5);
-      padding: 5px;
-      border-radius: 4px;
-      font-size: 11px;
-    }
-    #cameraPreview {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
+    #video {
       width: 160px;
       height: 120px;
-      border: 2px solid #0ff;
-      border-radius: 8px;
-      overflow: hidden;
+      border: 1px solid #0ff;
       display: none;
-      z-index: 100;
+      margin-top: 10px;
     }
-    #cameraPreview video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
+    #log {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #0ff;
+      font-size: 11px;
+      color: #fff;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #handInfo {
+      margin-top: 5px;
+      color: #ff0;
     }
     #version {
       position: absolute;
       bottom: 10px;
       left: 10px;
       color: #0ff;
-      font-family: monospace;
       font-size: 12px;
-      z-index: 100;
     }
   </style>
 </head>
 <body>
-  <div id="controls">
-    <div class="toggle-container">
-      <div class="toggle-switch" id="cameraSwitch"></div>
-      <span class="toggle-label">Camera</span>
-    </div>
-    <div id="info">
-      <div>Status: <span id="status">Off</span></div>
-      <div>Hand: <span id="handPos">--</span></div>
-      <div>BG: <span id="bgColor">#000000</span></div>
-    </div>
-    <div id="debugLog">
-      <div id="debugLogHeader">Debug Log</div>
-      <div id="debugLogContent"></div>
-    </div>
+  <div id="container">
+    <button id="startBtn">START CAMERA</button>
+    <div>Status: <span id="status">Off</span></div>
+    <div id="handInfo">No hand</div>
+    <video id="video" playsinline></video>
+    <div id="log"></div>
   </div>
+  <div id="version">v0.51 - Official MediaPipe</div>
 
-  <div id="cameraPreview">
-    <video id="previewVideo" autoplay playsinline muted></video>
-  </div>
-
-  <div id="version">v0.50-fix5 - Camera + Hand Tracking</div>
-
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="/src/main.js"></script>
 </body>
 </html>

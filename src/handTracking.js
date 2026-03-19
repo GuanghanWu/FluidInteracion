@@ -4,6 +4,7 @@ import { GestureRecognizer, FilesetResolver } from '@mediapipe/tasks-vision';
 let gestureRecognizer = null;
 let isGestureLoading = false;
 let lastVideoTime = -1;
+let frameCount = 0;
 
 export async function initGestureRecognizer() {
   if (gestureRecognizer) return true;
@@ -44,26 +45,54 @@ export async function initGestureRecognizer() {
 }
 
 export function detectGesture(video) {
-  if (!gestureRecognizer || video.currentTime === lastVideoTime) {
+  frameCount++;
+  
+  if (!gestureRecognizer) {
+    if (frameCount % 30 === 0) console.log('[Gesture] Recognizer not ready');
     return null;
   }
-
-  lastVideoTime = video.currentTime;
-  const results = gestureRecognizer.recognizeForVideo(video, performance.now());
-
-  if (results.gestures.length > 0 && results.landmarks.length > 0) {
-    const landmarks = results.landmarks[0];
-    const wrist = landmarks[0];
-
-    return {
-      x: wrist.x,
-      y: wrist.y,
-      gesture: results.gestures[0][0].categoryName,
-      landmarks: landmarks
-    };
+  
+  // 每30帧打印一次调试信息
+  const shouldLog = frameCount % 30 === 0;
+  
+  if (video.currentTime === lastVideoTime) {
+    if (shouldLog) console.log('[Gesture] Video frame unchanged');
+    return null;
   }
-
-  return null;
+  
+  lastVideoTime = video.currentTime;
+  
+  try {
+    const results = gestureRecognizer.recognizeForVideo(video, performance.now());
+    
+    if (shouldLog) {
+      console.log('[Gesture] Detection result:', {
+        gestures: results.gestures?.length || 0,
+        landmarks: results.landmarks?.length || 0
+      });
+    }
+    
+    if (results.gestures && results.gestures.length > 0 && 
+        results.landmarks && results.landmarks.length > 0) {
+      const landmarks = results.landmarks[0];
+      const wrist = landmarks[0];
+      const gestureName = results.gestures[0][0]?.categoryName || 'Unknown';
+      
+      console.log('[Gesture] Hand detected:', gestureName, 'at', wrist.x.toFixed(2), wrist.y.toFixed(2));
+      
+      return {
+        x: wrist.x,
+        y: wrist.y,
+        gesture: gestureName,
+        landmarks: landmarks
+      };
+    }
+    
+    return null;
+  } catch (err) {
+    console.error('[Gesture] Detection error:', err);
+    return null;
+  }
 }
 
 export function disposeGestureRecognizer() {

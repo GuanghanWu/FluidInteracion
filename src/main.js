@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.43 - 使用 GestureRecognizer
+ * Version: 0.44 - 添加手势检测调试
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

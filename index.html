@@ -200,10 +200,10 @@
             hands.setOptions({
               maxNumHands: 1,
               modelComplexity: 1,
-              minDetectionConfidence: 0.5,
-              minTrackingConfidence: 0.5
+              minDetectionConfidence: 0.2,
+              minTrackingConfidence: 0.2
             });
-            log('Options set (threshold=0.5)');
+            log('Options set (threshold=0.2)');
             
             log('Registering onResults callback...');
             hands.onResults(onResults);

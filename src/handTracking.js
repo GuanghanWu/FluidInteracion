@@ -6,6 +6,21 @@ let isGestureLoading = false;
 let lastVideoTime = -1;
 let frameCount = 0;
 
+// 辅助函数：写入 Debug Log 面板
+function logToPanel(level, msg) {
+  const logContent = document.getElementById('debugLogContent');
+  if (logContent) {
+    const colors = { info: '#00ffff', warning: '#ffff00', error: '#ff6666' };
+    const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const entry = document.createElement('div');
+    entry.style.cssText = 'margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.2); color: #fff;';
+    entry.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${colors[level] || colors.info}; font-weight: bold;">${level.toUpperCase()}</span>: ${msg}`;
+    logContent.appendChild(entry);
+    logContent.scrollTop = logContent.scrollHeight;
+  }
+  console.log(`[${level}]`, msg);
+}
+
 export async function initGestureRecognizer() {
   if (gestureRecognizer) return true;
   if (isGestureLoading) {
@@ -18,12 +33,12 @@ export async function initGestureRecognizer() {
   isGestureLoading = true;
 
   try {
-    console.log('[Gesture] Creating vision tasks...');
+    logToPanel('info', '[Gesture] Loading MediaPipe...');
     const vision = await FilesetResolver.forVisionTasks(
       'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
     );
 
-    console.log('[Gesture] Loading model...');
+    logToPanel('info', '[Gesture] Creating recognizer...');
     gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
@@ -33,10 +48,10 @@ export async function initGestureRecognizer() {
       numHands: 1
     });
 
-    console.log('[Gesture] Initialized successfully');
+    logToPanel('info', '[Gesture] Ready!');
     return true;
   } catch (err) {
-    console.error('[Gesture] Init failed:', err);
+    logToPanel('error', '[Gesture] Init failed: ' + err.message);
     gestureRecognizer = null;
     throw err;
   } finally {
@@ -48,15 +63,11 @@ export function detectGesture(video) {
   frameCount++;
   
   if (!gestureRecognizer) {
-    if (frameCount % 30 === 0) console.log('[Gesture] Recognizer not ready');
+    if (frameCount % 60 === 0) logToPanel('info', '[Gesture] Not ready yet');
     return null;
   }
   
-  // 每30帧打印一次调试信息
-  const shouldLog = frameCount % 30 === 0;
-  
   if (video.currentTime === lastVideoTime) {
-    if (shouldLog) console.log('[Gesture] Video frame unchanged');
     return null;
   }
   
@@ -65,20 +76,13 @@ export function detectGesture(video) {
   try {
     const results = gestureRecognizer.recognizeForVideo(video, performance.now());
     
-    if (shouldLog) {
-      console.log('[Gesture] Detection result:', {
-        gestures: results.gestures?.length || 0,
-        landmarks: results.landmarks?.length || 0
-      });
-    }
-    
     if (results.gestures && results.gestures.length > 0 && 
         results.landmarks && results.landmarks.length > 0) {
       const landmarks = results.landmarks[0];
       const wrist = landmarks[0];
       const gestureName = results.gestures[0][0]?.categoryName || 'Unknown';
       
-      console.log('[Gesture] Hand detected:', gestureName, 'at', wrist.x.toFixed(2), wrist.y.toFixed(2));
+      logToPanel('info', `[Gesture] Detected: ${gestureName}`);
       
       return {
         x: wrist.x,
@@ -88,9 +92,13 @@ export function detectGesture(video) {
       };
     }
     
+    if (frameCount % 60 === 0) {
+      logToPanel('info', `[Gesture] No hand (frame ${frameCount})`);
+    }
+    
     return null;
   } catch (err) {
-    console.error('[Gesture] Detection error:', err);
+    logToPanel('error', '[Gesture] Error: ' + err.message);
     return null;
   }
 }

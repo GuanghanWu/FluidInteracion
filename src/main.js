@@ -554,9 +554,9 @@ function setupControls() {
   
   // 摄像头开关
   document.getElementById('cameraToggle')?.addEventListener('change', (e) => {
-    console.log('[Camera] Toggle changed, checked:', e.target.checked);
+    debugLog('info', 'Camera toggle: ' + (e.target.checked ? 'ON' : 'OFF'));
     if (e.target.checked) {
-      console.log('[Camera] Calling startCamera()...');
+      debugLog('info', 'Starting camera...');
       startCamera();
     } else {
       stopCamera();
@@ -758,7 +758,6 @@ function animate() {
 // ==================== 手势控制 (GestureRecognizer) ====================
 
 async function startCamera() {
-  console.log('[Camera] ========== startCamera() ENTERED ==========');
   const cameraToggle = document.getElementById('cameraToggle');
   const handStatus = document.getElementById('handStatus');
   const previewControl = document.getElementById('previewControl');
@@ -766,7 +765,6 @@ async function startCamera() {
   const cameraPreview = document.getElementById('cameraPreview');
   
   try {
-    console.log('[Camera] Initializing GestureRecognizer...');
     debugLog('info', 'Initializing GestureRecognizer...');
     const success = await initGestureRecognizer();
     if (!success) {
@@ -802,31 +800,26 @@ async function startCamera() {
     }
     
     debugLog('info', 'Camera started: ' + videoElement.videoWidth + 'x' + videoElement.videoHeight);
+    debugLog('info', 'Starting detect loop...');
     
     // 检测循环
     let detectFrameCount = 0;
-    console.log('[Camera] About to define detectLoop...');
     
     function detectLoop() {
-      console.log('[Camera] ENTER detectLoop function body');
-      
       if (!isCameraActive) {
-        console.log('[Camera] detectLoop stopped - isCameraActive is false');
+        debugLog('info', 'detectLoop stopped');
         return;
       }
       
       detectFrameCount++;
       if (detectFrameCount % 60 === 0) {
-        console.log('[Camera] detectLoop running, frame:', detectFrameCount, 'readyState:', videoElement?.readyState);
+        debugLog('info', 'detectLoop frame #' + detectFrameCount);
       }
       
       if (videoElement.readyState >= 2) {
-        if (detectFrameCount % 60 === 0) {
-          console.log('[Camera] Calling detectGesture...');
-        }
         const result = detectGesture(videoElement);
-        if (detectFrameCount % 60 === 0) {
-          console.log('[Camera] detectGesture returned:', result ? 'hand detected' : 'null');
+        if (result && detectFrameCount % 30 === 0) {
+          debugLog('info', 'Hand detected: ' + result.gesture);
         }
         
         if (result) {
@@ -856,9 +849,7 @@ async function startCamera() {
       
       requestAnimationFrame(detectLoop);
     }
-    console.log('[Camera] Calling detectLoop() now...');
     detectLoop();
-    console.log('[Camera] detectLoop() returned (this should NOT print if loop is working)');
     
   } catch (error) {
     debugLog('error', 'Camera failed: ' + error.message);

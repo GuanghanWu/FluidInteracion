@@ -69,7 +69,7 @@
     <video id="video" playsinline></video>
     <div id="log"></div>
   </div>
-  <div id="version">v0.52 - All-in-One</div>
+  <div id="version">v0.52-fix - All-in-One</div>
 
   <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -111,7 +111,17 @@
         log('Camera OK');
       }
 
+      let frameCount = 0;
+      
       function onResults(results) {
+        frameCount++;
+        
+        // 每30帧记录一次
+        if (frameCount % 30 === 0) {
+          const handCount = results.multiHandLandmarks?.length || 0;
+          log(`Frame ${frameCount}: ${handCount} hand(s)`);
+        }
+        
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           const landmarks = results.multiHandLandmarks[0];
           const wrist = landmarks[0];
@@ -125,8 +135,8 @@
           const b = Math.round((1 - wrist.x) * 255);
           document.body.style.background = `rgb(${r},${g},${b})`;
           
-          if (Math.random() < 0.02) {
-            log(`Hand: ${x}%, ${y}%`);
+          if (frameCount % 30 === 0) {
+            log(`Detected at ${x}%, ${y}%`);
           }
         } else {
           handInfo.textContent = 'No hand';
@@ -150,9 +160,9 @@
             
             hands.setOptions({
               maxNumHands: 1,
-              modelComplexity: 1,
-              minDetectionConfidence: 0.5,
-              minTrackingConfidence: 0.5
+              modelComplexity: 0,  // 轻量级
+              minDetectionConfidence: 0.3,  // 降低阈值
+              minTrackingConfidence: 0.3
             });
             
             hands.onResults(onResults);
@@ -168,6 +178,9 @@
             
             log('Starting...');
             await camera.start();
+            
+            // 检查视频尺寸
+            log(`Video: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
             
             statusEl.textContent = 'Running';
             statusEl.style.color = '#0f0';

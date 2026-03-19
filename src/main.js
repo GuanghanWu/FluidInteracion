@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.40 - HSV面板放颜色下方，EdgeSoftness效果增强
+ * Version: 0.41 - 清理手势代码，准备重新设计摄像头功能
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';

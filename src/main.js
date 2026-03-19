@@ -801,11 +801,10 @@ async function startCamera() {
     
     // 检测循环
     let detectFrameCount = 0;
-    console.log('[Camera] detectLoop defined, about to start...');
+    console.log('[Camera] About to define detectLoop...');
     
     function detectLoop() {
-      // 无条件日志 - 确保每次都被记录
-      console.log('[Camera] detectLoop called, isCameraActive:', isCameraActive, 'readyState:', videoElement?.readyState);
+      console.log('[Camera] ENTER detectLoop function body');
       
       if (!isCameraActive) {
         console.log('[Camera] detectLoop stopped - isCameraActive is false');
@@ -813,6 +812,9 @@ async function startCamera() {
       }
       
       detectFrameCount++;
+      if (detectFrameCount % 60 === 0) {
+        console.log('[Camera] detectLoop running, frame:', detectFrameCount, 'readyState:', videoElement?.readyState);
+      }
       
       if (videoElement.readyState >= 2) {
         if (detectFrameCount % 60 === 0) {
@@ -850,7 +852,9 @@ async function startCamera() {
       
       requestAnimationFrame(detectLoop);
     }
+    console.log('[Camera] Calling detectLoop() now...');
     detectLoop();
+    console.log('[Camera] detectLoop() returned (this should NOT print if loop is working)');
     
   } catch (error) {
     debugLog('error', 'Camera failed: ' + error.message);

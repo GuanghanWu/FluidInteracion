@@ -45,7 +45,9 @@ export async function initGestureRecognizer() {
         delegate: 'GPU'
       },
       runningMode: 'VIDEO',
-      numHands: 1
+      numHands: 1,
+      minHandDetectionConfidence: 0.3,
+      minHandPresenceConfidence: 0.3
     });
 
     logToPanel('info', '[Gesture] Ready!');
@@ -69,6 +71,11 @@ export function detectGesture(video) {
   
   if (video.currentTime === lastVideoTime) {
     return null;
+  }
+  
+  // 每60帧打印视频信息
+  if (frameCount % 60 === 0) {
+    logToPanel('info', `[Gesture] Video: ${video.videoWidth}x${video.videoHeight}, playing: ${!video.paused}`);
   }
   
   lastVideoTime = video.currentTime;

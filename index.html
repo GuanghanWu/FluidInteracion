@@ -23,6 +23,7 @@
       border-radius: 8px;
       border: 1px solid #0ff;
       z-index: 100;
+      max-width: 250px;
     }
     /* Toggle Switch */
     .toggle-container {
@@ -67,6 +68,29 @@
       color: #fff;
       font-size: 12px;
     }
+    #info div {
+      margin-bottom: 3px;
+    }
+    /* Debug Log */
+    #debugLog {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #0ff;
+    }
+    #debugLogHeader {
+      font-size: 11px;
+      color: #0ff;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    #debugLogContent {
+      max-height: 150px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.5);
+      padding: 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
     #cameraPreview {
       position: absolute;
       bottom: 10px;
@@ -107,13 +131,17 @@
       <div>Hand: <span id="handPos">--</span></div>
       <div>BG: <span id="bgColor">#000000</span></div>
     </div>
+    <div id="debugLog">
+      <div id="debugLogHeader">Debug Log</div>
+      <div id="debugLogContent"></div>
+    </div>
   </div>
 
   <div id="cameraPreview">
     <video id="previewVideo" autoplay playsinline muted></video>
   </div>
 
-  <div id="version">v0.50-fix3 - Camera + Hand Tracking</div>
+  <div id="version">v0.50-fix4 - Camera + Hand Tracking</div>
 
   <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>

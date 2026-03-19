@@ -1,6 +1,6 @@
 /**
  * Camera Hand Tracker
- * Version: 0.50-fix2 - 使用全局 MediaPipe
+ * Version: 0.50-fix4 - 使用 Debug Log 面板
  */
 
 // DOM 元素
@@ -15,6 +15,7 @@ const bgColorEl = document.getElementById('bgColor');
 let isCameraActive = false;
 let hands = null;
 let camera = null;
+let frameCount = 0;
 
 // 初始化
 init();
@@ -30,33 +31,46 @@ function init() {
   });
 }
 
+// Debug Log 函数 - 写入页面面板
+function debugLog(level, msg) {
+  const logContent = document.getElementById('debugLogContent');
+  if (!logContent) return;
+  
+  const colors = { info: '#00ffff', warning: '#ffff00', error: '#ff6666' };
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const entry = document.createElement('div');
+  entry.style.cssText = 'margin-bottom: 2px; padding: 2px 0; border-bottom: 1px solid rgba(0,255,255,0.1); color: #fff; font-size: 11px;';
+  entry.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${colors[level] || colors.info}; font-weight: bold;">${level.toUpperCase()}</span>: ${msg}`;
+  logContent.appendChild(entry);
+  logContent.scrollTop = logContent.scrollHeight;
+}
+
 async function startCamera() {
   statusEl.textContent = 'Loading...';
   statusEl.style.color = '#ff0';
+  debugLog('info', 'Starting camera...');
 
   try {
-    // 检查 MediaPipe 是否加载
     if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-      throw new Error('MediaPipe not loaded yet, please wait');
+      throw new Error('MediaPipe not loaded yet');
     }
 
     statusEl.textContent = 'Initializing...';
+    debugLog('info', 'MediaPipe loaded, initializing Hands...');
 
-    // 创建 Hands 实例
     hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
     });
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 1, // 试试中等复杂度
-      minDetectionConfidence: 0.3, // 降低阈值
+      modelComplexity: 1,
+      minDetectionConfidence: 0.3,
       minTrackingConfidence: 0.3
     });
 
     hands.onResults(onResults);
 
-    // 启动摄像头
     camera = new Camera(previewVideo, {
       onFrame: async () => {
         await hands.send({ image: previewVideo });
@@ -67,9 +81,7 @@ async function startCamera() {
 
     await camera.start();
 
-    // 检查视频是否正常工作
-    console.log('[Debug] Video readyState:', previewVideo.readyState);
-    console.log('[Debug] Video size:', previewVideo.videoWidth, 'x', previewVideo.videoHeight);
+    debugLog('info', `Video started: ${previewVideo.videoWidth}x${previewVideo.videoHeight}`);
 
     isCameraActive = true;
     cameraPreview.style.display = 'block';
@@ -79,10 +91,9 @@ async function startCamera() {
   } catch (error) {
     statusEl.textContent = 'Error: ' + error.message;
     statusEl.style.color = '#f00';
-    console.error(error);
+    debugLog('error', error.message);
     cameraSwitch.classList.remove('active');
     
-    // 如果 MediaPipe 没加载，3秒后重试
     if (error.message.includes('not loaded')) {
       setTimeout(() => {
         if (cameraSwitch.classList.contains('active')) {
@@ -109,18 +120,17 @@ function stopCamera() {
   handPosEl.textContent = '--';
   document.body.style.background = '#000';
   bgColorEl.textContent = '#000000';
+  debugLog('info', 'Camera stopped');
 }
-
-let frameCount = 0;
 
 function onResults(results) {
   if (!isCameraActive) return;
 
   frameCount++;
 
-  // 每30帧打印一次调试信息
   if (frameCount % 30 === 0) {
-    console.log('[Debug] Frame:', frameCount, 'Hands:', results.multiHandLandmarks?.length || 0);
+    const handCount = results.multiHandLandmarks?.length || 0;
+    debugLog('info', `Frame ${frameCount}: ${handCount} hand(s)`);
   }
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -139,7 +149,7 @@ function onResults(results) {
     bgColorEl.textContent = color;
 
     if (frameCount % 30 === 0) {
-      console.log('[Debug] Hand detected at:', x.toFixed(2), y.toFixed(2));
+      debugLog('info', `Hand at ${(x*100).toFixed(0)}%, ${(y*100).toFixed(0)}%`);
     }
   } else {
     handPosEl.textContent = 'Not detected';

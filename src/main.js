@@ -1,7 +1,7 @@
 /**
  * Fluid Simulation MVP - GPU Metaballs Version
  * SPH + GPU Distance Field + Shader
- * Version: 0.44 - 添加手势检测调试
+ * Version: 0.44-fix - 添加 detectLoop 调试日志
  */
 import * as THREE from 'three';
 import { SPHSolver } from './core/SPHSolver.js';
@@ -800,11 +800,26 @@ async function startCamera() {
     debugLog('info', 'Camera started: ' + videoElement.videoWidth + 'x' + videoElement.videoHeight);
     
     // 检测循环
+    let detectFrameCount = 0;
     function detectLoop() {
-      if (!isCameraActive) return;
+      if (!isCameraActive) {
+        console.log('[Camera] detectLoop stopped - isCameraActive is false');
+        return;
+      }
+      
+      detectFrameCount++;
+      if (detectFrameCount % 60 === 0) {
+        console.log('[Camera] detectLoop running, readyState:', videoElement.readyState);
+      }
       
       if (videoElement.readyState >= 2) {
+        if (detectFrameCount % 60 === 0) {
+          console.log('[Camera] Calling detectGesture...');
+        }
         const result = detectGesture(videoElement);
+        if (detectFrameCount % 60 === 0) {
+          console.log('[Camera] detectGesture returned:', result ? 'hand detected' : 'null');
+        }
         
         if (result) {
           handTracking.isDetected = true;

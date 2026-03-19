@@ -49,9 +49,9 @@ async function startCamera() {
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 0,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      modelComplexity: 1, // 试试中等复杂度
+      minDetectionConfidence: 0.3, // 降低阈值
+      minTrackingConfidence: 0.3
     });
 
     hands.onResults(onResults);
@@ -66,6 +66,10 @@ async function startCamera() {
     });
 
     await camera.start();
+
+    // 检查视频是否正常工作
+    console.log('[Debug] Video readyState:', previewVideo.readyState);
+    console.log('[Debug] Video size:', previewVideo.videoWidth, 'x', previewVideo.videoHeight);
 
     isCameraActive = true;
     cameraPreview.style.display = 'block';
@@ -107,8 +111,17 @@ function stopCamera() {
   bgColorEl.textContent = '#000000';
 }
 
+let frameCount = 0;
+
 function onResults(results) {
   if (!isCameraActive) return;
+
+  frameCount++;
+
+  // 每30帧打印一次调试信息
+  if (frameCount % 30 === 0) {
+    console.log('[Debug] Frame:', frameCount, 'Hands:', results.multiHandLandmarks?.length || 0);
+  }
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const wrist = results.multiHandLandmarks[0][0];
@@ -124,6 +137,10 @@ function onResults(results) {
 
     document.body.style.background = color;
     bgColorEl.textContent = color;
+
+    if (frameCount % 30 === 0) {
+      console.log('[Debug] Hand detected at:', x.toFixed(2), y.toFixed(2));
+    }
   } else {
     handPosEl.textContent = 'Not detected';
     document.body.style.background = '#000';

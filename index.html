@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hand Tracking</title>
+  <title>Hand Tracking - TensorFlow.js</title>
   <style>
     body { 
       margin: 0; 
@@ -40,7 +40,14 @@
       border: 1px solid #0ff;
       display: none;
       margin-top: 10px;
-      transform: scaleX(-1); /* 前置摄像头镜像 */
+      transform: scaleX(-1);
+    }
+    #canvas {
+      width: 160px;
+      height: 120px;
+      border: 1px solid #0ff;
+      display: none;
+      margin-top: 10px;
     }
     #log {
       margin-top: 10px;
@@ -71,12 +78,14 @@
     <div>Status: <span id="status">Off</span></div>
     <div id="handInfo">No hand</div>
     <video id="video" playsinline muted></video>
-    <canvas id="canvas" width="160" height="120" style="display:none; margin-top:10px; border:1px solid #0ff; transform: scaleX(-1);"></canvas>
+    <canvas id="canvas" width="160" height="120"></canvas>
     <div id="log"></div>
   </div>
-  <div id="version">v0.54 - Draw 21 Hand Points</div>
+  <div id="version">v0.60 - TensorFlow.js Handpose</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
   
   <script>
     (function() {
@@ -88,7 +97,7 @@
       const handInfo = document.getElementById('handInfo');
       const logEl = document.getElementById('log');
 
-      let hands = null;
+      let model = null;
       let isRunning = false;
       let rafId = null;
 
@@ -113,104 +122,49 @@
         });
       }
 
-      let resultCount = 0;
-      let lastResultTime = Date.now();
-      
-      // On results
-      function onResults(results) {
-        resultCount++;
-        
-        // 绘制视频帧
+      // Detect and draw
+      async function detect() {
+        if (!isRunning || !model) return;
+
+        // Draw video
         ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.scale(-1, 1);
         ctx.translate(-canvas.width, 0);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
-        
-        // 每30次回调记录一次
-        if (resultCount % 30 === 0) {
-          const hasMultiHandLandmarks = !!results.multiHandLandmarks;
-          const isArray = Array.isArray(results.multiHandLandmarks);
-          const length = results.multiHandLandmarks?.length || 0;
-          const timeSinceLast = Date.now() - lastResultTime;
-          log(`#${resultCount}: hands=${length}, ms=${timeSinceLast}`);
-          lastResultTime = Date.now();
-        }
-        
-        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-          const landmarks = results.multiHandLandmarks[0];
+
+        // Detect hands
+        const predictions = await model.estimateHands(video);
+
+        if (predictions.length > 0) {
+          const hand = predictions[0];
+          const landmarks = hand.landmarks;
+          const palmBase = landmarks[0]; // [x, y, z]
           
-          // 绘制21个关键点
+          // Draw landmarks
           ctx.fillStyle = '#00ff00';
           for (let i = 0; i < landmarks.length; i++) {
-            const x = landmarks[i].x * canvas.width;
-            const y = landmarks[i].y * canvas.height;
+            const x = landmarks[i][0] * (canvas.width / video.videoWidth);
+            const y = landmarks[i][1] * (canvas.height / video.videoHeight);
             ctx.beginPath();
-            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.arc(canvas.width - x, y, 2, 0, 2 * Math.PI);
             ctx.fill();
           }
-          
-          // 绘制骨骼连线
-          const connections = [
-            [0,1],[1,2],[2,3],[3,4],           // 拇指
-            [0,5],[5,6],[6,7],[7,8],           // 食指
-            [0,9],[9,10],[10,11],[11,12],      // 中指
-            [0,13],[13,14],[14,15],[15,16],    // 无名指
-            [0,17],[17,18],[18,19],[19,20]     // 小指
-          ];
-          ctx.strokeStyle = '#00ffff';
-          ctx.lineWidth = 2;
-          for (const [start, end] of connections) {
-            ctx.beginPath();
-            ctx.moveTo(landmarks[start].x * canvas.width, landmarks[start].y * canvas.height);
-            ctx.lineTo(landmarks[end].x * canvas.width, landmarks[end].y * canvas.height);
-            ctx.stroke();
-          }
-          
-          const wrist = landmarks[0];
-          const x = Math.round(wrist.x * 100);
-          const y = Math.round(wrist.y * 100);
-          
+
+          const x = Math.round((palmBase[0] / video.videoWidth) * 100);
+          const y = Math.round((palmBase[1] / video.videoHeight) * 100);
           handInfo.textContent = `Hand: ${x}%, ${y}% | 21 points`;
-          
-          const r = Math.round(wrist.x * 255);
-          const g = Math.round((1 - wrist.y) * 128);
-          const b = Math.round((1 - wrist.x) * 255);
+
+          const r = Math.round((palmBase[0] / video.videoWidth) * 255);
+          const g = Math.round((1 - palmBase[1] / video.videoHeight) * 128);
+          const b = Math.round((1 - palmBase[0] / video.videoWidth) * 255);
           document.body.style.background = `rgb(${r},${g},${b})`;
-          
-          if (resultCount % 30 === 0) {
-            log(`✓ Hand detected: ${x}%, ${y}%, 21 points drawn`);
-          }
         } else {
           handInfo.textContent = 'No hand';
           document.body.style.background = '#000';
         }
-      }
 
-      // Render loop
-      let frameCount = 0;
-      async function render() {
-        if (!isRunning) return;
-        
-        frameCount++;
-        
-        if (video.readyState >= 2) {
-          if (frameCount % 60 === 0) {
-            log(`Sending frame #${frameCount}, readyState=${video.readyState}, video=${video.videoWidth}x${video.videoHeight}`);
-          }
-          try {
-            await hands.send({ image: video });
-          } catch (err) {
-            log(`ERROR sending frame: ${err.message}`);
-          }
-        } else {
-          if (frameCount % 60 === 0) {
-            log(`Video not ready, readyState=${video.readyState}`);
-          }
-        }
-        
-        rafId = requestAnimationFrame(render);
+        rafId = requestAnimationFrame(detect);
       }
 
       // Start/Stop
@@ -219,47 +173,32 @@
           log('Starting...');
           
           try {
+            // Load model
+            if (!model) {
+              log('Loading TensorFlow.js model...');
+              model = await handpose.load();
+              log('Model loaded!');
+            }
+
             // Setup camera
             await setupCamera();
             video.play();
             video.style.display = 'block';
             canvas.style.display = 'block';
             log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
-
-            // Init hands with selfie mode for front camera
-            log('Creating Hands instance...');
-            hands = new Hands({
-              locateFile: (file) => {
-                log(`Loading model file: ${file}`);
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-              }
-            });
-            log('Hands instance created');
-            
-            log('Setting options...');
-            hands.setOptions({
-              maxNumHands: 1,
-              modelComplexity: 1,
-              minDetectionConfidence: 0.2,
-              minTrackingConfidence: 0.2
-            });
-            log('Options set (threshold=0.2)');
-            
-            log('Registering onResults callback...');
-            hands.onResults(onResults);
-            log('Callback registered');
             
             isRunning = true;
             statusEl.textContent = 'Running';
             statusEl.style.color = '#0f0';
             startBtn.textContent = 'STOP';
             
-            // Start render loop
-            render();
+            // Start detection
+            detect();
             log('Started! Show your hand');
             
           } catch (err) {
             log('ERROR: ' + err.message);
+            console.error(err);
             statusEl.textContent = 'Error';
             statusEl.style.color = '#f00';
           }
@@ -271,7 +210,6 @@
             video.srcObject.getTracks().forEach(t => t.stop());
             video.srcObject = null;
           }
-          hands = null;
           video.style.display = 'none';
           canvas.style.display = 'none';
           statusEl.textContent = 'Off';

@@ -40,7 +40,7 @@
       border: 1px solid #0ff;
       display: none;
       margin-top: 10px;
-      /* no transform - test without mirror */
+      transform: scaleX(-1); /* 前置摄像头镜像 */
     }
     #log {
       margin-top: 10px;
@@ -153,7 +153,7 @@
             video.style.display = 'block';
             log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
 
-            // Init hands
+            // Init hands with selfie mode for front camera
             hands = new Hands({
               locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
             });
@@ -162,7 +162,8 @@
               maxNumHands: 1,
               modelComplexity: 1,
               minDetectionConfidence: 0.5,
-              minTrackingConfidence: 0.5
+              minTrackingConfidence: 0.5,
+              selfieMode: true  // 前置摄像头模式
             });
             
             hands.onResults(onResults);

@@ -34,6 +34,29 @@
       cursor: pointer;
       margin-bottom: 10px;
     }
+    button:disabled {
+      background: #666;
+      color: #999;
+      cursor: not-allowed;
+    }
+    #loadingStatus {
+      color: #ff0;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #0ff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 5px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     #video {
       width: 160px;
       height: 120px;
@@ -74,13 +97,14 @@
 </head>
 <body>
   <div id="container">
-    <button id="startBtn">START CAMERA</button>
+    <div id="loadingStatus"><span class="spinner"></span>Loading model...</div>
+    <button id="startBtn" disabled>START CAMERA</button>
     <div>Status: <span id="status">Off</span></div>
     <div id="handInfo">No hand</div>
     <canvas id="canvas" width="160" height="120"></canvas>
     <div id="log"></div>
   </div>
-  <div id="version">v0.60-fix - Single Canvas</div>
+  <div id="version">v0.61 - Auto-load Model</div>
 
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
@@ -101,10 +125,12 @@
       const statusEl = document.getElementById('status');
       const handInfo = document.getElementById('handInfo');
       const logEl = document.getElementById('log');
+      const loadingStatus = document.getElementById('loadingStatus');
 
       let model = null;
       let isRunning = false;
       let rafId = null;
+      let isModelLoading = false;
 
       function log(msg) {
         const div = document.createElement('div');
@@ -174,17 +200,15 @@
 
       // Start/Stop
       startBtn.addEventListener('click', async () => {
+        if (!model) {
+          log('Please wait for model to load');
+          return;
+        }
+        
         if (!isRunning) {
           log('Starting...');
           
           try {
-            // Load model
-            if (!model) {
-              log('Loading TensorFlow.js model...');
-              model = await handpose.load();
-              log('Model loaded!');
-            }
-
             // Setup camera
             await setupCamera();
             video.play();
@@ -224,7 +248,33 @@
         }
       });
 
-      log('Ready - Click START CAMERA');
+      // Auto-load model on page load
+      (async function loadModel() {
+        if (isModelLoading || model) return;
+        isModelLoading = true;
+        
+        try {
+          log('Auto-loading model...');
+          const startTime = Date.now();
+          model = await handpose.load();
+          const loadTime = Date.now() - startTime;
+          log(`Model loaded in ${loadTime}ms`);
+          
+          // Enable button
+          startBtn.disabled = false;
+          loadingStatus.innerHTML = '✓ Model ready';
+          loadingStatus.style.color = '#0f0';
+          
+        } catch (err) {
+          log('ERROR loading model: ' + err.message);
+          loadingStatus.innerHTML = '✗ Failed to load model';
+          loadingStatus.style.color = '#f00';
+          isModelLoading = false;
+          
+          // Retry after 3 seconds
+          setTimeout(loadModel, 3000);
+        }
+      })();
     })();
   </script>
 </body>

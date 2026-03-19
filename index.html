@@ -58,8 +58,8 @@
       to { transform: rotate(360deg); }
     }
     #canvas {
-      width: 160px;
-      height: 120px;
+      width: 240px;
+      height: 160px;
       border: 1px solid #0ff;
       display: none;
       margin-top: 10px;
@@ -93,7 +93,7 @@
     <button id="startBtn" disabled>START CAMERA</button>
     <div>Status: <span id="status">Off</span></div>
     <div id="handInfo">No hand</div>
-    <canvas id="canvas" width="160" height="120"></canvas>
+    <canvas id="canvas" width="240" height="160"></canvas>
     <div id="log"></div>
   </div>
   <div id="version">v0.62 - Stable Load</div>
@@ -149,7 +149,7 @@
       // Setup camera
       async function setupCamera() {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240 },
+          video: { width: 480, height: 320 },
           audio: false
         });
         video.srcObject = stream;

@@ -1,6 +1,6 @@
 /**
  * Camera Hand Tracker
- * Version: 0.50-fix4 - 使用 Debug Log 面板
+ * Version: 0.50-fix5 - 使用标准 getUserMedia
  */
 
 // DOM 元素
@@ -14,7 +14,7 @@ const bgColorEl = document.getElementById('bgColor');
 // 状态
 let isCameraActive = false;
 let hands = null;
-let camera = null;
+let animationId = null;
 let frameCount = 0;
 
 // 初始化
@@ -31,7 +31,7 @@ function init() {
   });
 }
 
-// Debug Log 函数 - 写入页面面板
+// Debug Log 函数
 function debugLog(level, msg) {
   const logContent = document.getElementById('debugLogContent');
   if (!logContent) return;
@@ -51,7 +51,7 @@ async function startCamera() {
   debugLog('info', 'Starting camera...');
 
   try {
-    if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+    if (typeof Hands === 'undefined') {
       throw new Error('MediaPipe not loaded yet');
     }
 
@@ -71,49 +71,73 @@ async function startCamera() {
 
     hands.onResults(onResults);
 
-    camera = new Camera(previewVideo, {
-      onFrame: async () => {
-        await hands.send({ image: previewVideo });
-      },
-      width: 320,
-      height: 240
+    // 使用标准 getUserMedia
+    debugLog('info', 'Requesting camera permission...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        width: { ideal: 320 },
+        height: { ideal: 240 },
+        facingMode: 'user'
+      }
     });
 
-    await camera.start();
+    previewVideo.srcObject = stream;
+    
+    // 等待视频准备好
+    await new Promise((resolve) => {
+      previewVideo.onloadedmetadata = () => {
+        debugLog('info', `Video metadata: ${previewVideo.videoWidth}x${previewVideo.videoHeight}`);
+        resolve();
+      };
+    });
 
-    debugLog('info', `Video started: ${previewVideo.videoWidth}x${previewVideo.videoHeight}`);
+    await previewVideo.play();
+    debugLog('info', `Video playing: ${previewVideo.videoWidth}x${previewVideo.videoHeight}`);
 
     isCameraActive = true;
     cameraPreview.style.display = 'block';
     statusEl.textContent = 'Active - Show your hand';
     statusEl.style.color = '#0f0';
 
+    // 开始检测循环
+    detectLoop();
+
   } catch (error) {
     statusEl.textContent = 'Error: ' + error.message;
     statusEl.style.color = '#f00';
     debugLog('error', error.message);
     cameraSwitch.classList.remove('active');
-    
-    if (error.message.includes('not loaded')) {
-      setTimeout(() => {
-        if (cameraSwitch.classList.contains('active')) {
-          startCamera();
-        }
-      }, 3000);
-    }
   }
+}
+
+async function detectLoop() {
+  if (!isCameraActive) return;
+
+  if (previewVideo.readyState >= 2 && hands) {
+    await hands.send({ image: previewVideo });
+  }
+
+  animationId = requestAnimationFrame(detectLoop);
 }
 
 function stopCamera() {
   isCameraActive = false;
-  if (camera) {
-    camera.stop();
-    camera = null;
+  
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
   }
+
+  if (previewVideo.srcObject) {
+    previewVideo.srcObject.getTracks().forEach(track => track.stop());
+    previewVideo.srcObject = null;
+  }
+
   if (hands) {
     hands.close();
     hands = null;
   }
+
   cameraPreview.style.display = 'none';
   statusEl.textContent = 'Off';
   statusEl.style.color = '#fff';
@@ -124,8 +148,6 @@ function stopCamera() {
 }
 
 function onResults(results) {
-  if (!isCameraActive) return;
-
   frameCount++;
 
   if (frameCount % 30 === 0) {

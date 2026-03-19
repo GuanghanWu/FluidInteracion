@@ -73,7 +73,7 @@
     <video id="video" playsinline muted></video>
     <div id="log"></div>
   </div>
-  <div id="version">v0.53 - requestAnimationFrame</div>
+  <div id="version">v0.53-fix3 - Debug Logs</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   
@@ -110,8 +110,20 @@
         });
       }
 
+      let resultCount = 0;
+      
       // On results
       function onResults(results) {
+        resultCount++;
+        
+        // 每30次回调记录一次
+        if (resultCount % 30 === 0) {
+          const hasMultiHandLandmarks = !!results.multiHandLandmarks;
+          const isArray = Array.isArray(results.multiHandLandmarks);
+          const length = results.multiHandLandmarks?.length || 0;
+          log(`Callback #${resultCount}: multiHandLandmarks=${hasMultiHandLandmarks}, isArray=${isArray}, length=${length}`);
+        }
+        
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           const landmarks = results.multiHandLandmarks[0];
           const wrist = landmarks[0];
@@ -124,6 +136,10 @@
           const g = Math.round((1 - wrist.y) * 128);
           const b = Math.round((1 - wrist.x) * 255);
           document.body.style.background = `rgb(${r},${g},${b})`;
+          
+          if (resultCount % 30 === 0) {
+            log(`✓ Hand detected: ${x}%, ${y}%`);
+          }
         } else {
           handInfo.textContent = 'No hand';
           document.body.style.background = '#000';
@@ -131,11 +147,25 @@
       }
 
       // Render loop
+      let frameCount = 0;
       async function render() {
         if (!isRunning) return;
         
+        frameCount++;
+        
         if (video.readyState >= 2) {
-          await hands.send({ image: video });
+          if (frameCount % 60 === 0) {
+            log(`Sending frame #${frameCount}, readyState=${video.readyState}, video=${video.videoWidth}x${video.videoHeight}`);
+          }
+          try {
+            await hands.send({ image: video });
+          } catch (err) {
+            log(`ERROR sending frame: ${err.message}`);
+          }
+        } else {
+          if (frameCount % 60 === 0) {
+            log(`Video not ready, readyState=${video.readyState}`);
+          }
         }
         
         rafId = requestAnimationFrame(render);
@@ -154,19 +184,28 @@
             log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
 
             // Init hands with selfie mode for front camera
+            log('Creating Hands instance...');
             hands = new Hands({
-              locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+              locateFile: (file) => {
+                log(`Loading model file: ${file}`);
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+              }
             });
+            log('Hands instance created');
             
+            log('Setting options...');
             hands.setOptions({
               maxNumHands: 1,
               modelComplexity: 1,
               minDetectionConfidence: 0.5,
               minTrackingConfidence: 0.5,
-              selfieMode: true  // 前置摄像头模式
+              selfieMode: true
             });
+            log('Options set');
             
+            log('Registering onResults callback...');
             hands.onResults(onResults);
+            log('Callback registered');
             
             isRunning = true;
             statusEl.textContent = 'Running';

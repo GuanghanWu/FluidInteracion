@@ -1,42 +1,10 @@
 // MediaPipe GestureRecognizer 手势追踪
-// 使用 script 标签加载的 MediaPipe
+// 使用 ES Module 动态导入
 
 let gestureRecognizer = null;
 let isGestureLoading = false;
 let lastVideoTime = -1;
-
-function waitForMediaPipe() {
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    const maxAttempts = 300; // 30秒超时
-    
-    function check() {
-      if (window.GestureRecognizer && window.FilesetResolver) {
-        console.log('[Gesture] MediaPipe loaded after', attempts * 100, 'ms');
-        resolve({
-          GestureRecognizer: window.GestureRecognizer,
-          FilesetResolver: window.FilesetResolver
-        });
-        return;
-      }
-      
-      attempts++;
-      if (attempts >= maxAttempts) {
-        reject(new Error('MediaPipe loading timeout (30s)'));
-        return;
-      }
-      
-      // 每5秒输出一次进度
-      if (attempts % 50 === 0) {
-        console.log('[Gesture] Still loading...', attempts * 100, 'ms');
-      }
-      
-      setTimeout(check, 100);
-    }
-    
-    check();
-  });
-}
+let visionModule = null;
 
 export async function initGestureRecognizer() {
   if (gestureRecognizer) return true;
@@ -51,16 +19,20 @@ export async function initGestureRecognizer() {
   isGestureLoading = true;
   
   try {
-    console.log('[Gesture] Waiting for MediaPipe...');
-    const { GestureRecognizer, FilesetResolver } = await waitForMediaPipe();
+    console.log('[Gesture] Loading MediaPipe Tasks Vision...');
+    
+    // 动态导入 ES Module 版本
+    const vision = await import('https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm');
+    visionModule = vision;
+    const { GestureRecognizer, FilesetResolver } = vision;
     
     console.log('[Gesture] Creating vision tasks...');
-    const vision = await FilesetResolver.forVisionTasks(
+    const filesetResolver = await FilesetResolver.forVisionTasks(
       'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
     );
     
     console.log('[Gesture] Loading model...');
-    gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+    gestureRecognizer = await GestureRecognizer.createFromOptions(filesetResolver, {
       baseOptions: {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
         delegate: 'GPU'

@@ -453,37 +453,6 @@
       }
       console.log(`[${level}]`, msg);
     }
-    
-    // IIFE 版本 - 挂载到 window
-    const cdnUrls = [
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/iife/vision_bundle.js'
-    ];
-    
-    async function loadMediaPipe() {
-      mpLog('info', 'Starting MediaPipe load...');
-      for (const url of cdnUrls) {
-        try {
-          mpLog('info', 'Trying CDN: ' + url.split('/')[2]);
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = url;
-            script.crossOrigin = 'anonymous';
-            script.onload = () => {
-              mpLog('info', 'Loaded from: ' + url.split('/')[2]);
-              resolve();
-            };
-            script.onerror = () => reject(new Error('Failed'));
-            document.head.appendChild(script);
-          });
-          return; // 成功加载
-        } catch (e) {
-          mpLog('error', 'Failed: ' + url.split('/')[2]);
-        }
-      }
-      mpLog('error', 'All CDN failed!');
-    }
-    
-    loadMediaPipe();
   </script>
   <script type="module" src="/src/main.js"></script>
 </body>

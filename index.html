@@ -71,15 +71,18 @@
     <div>Status: <span id="status">Off</span></div>
     <div id="handInfo">No hand</div>
     <video id="video" playsinline muted></video>
+    <canvas id="canvas" width="160" height="120" style="display:none; margin-top:10px; border:1px solid #0ff; transform: scaleX(-1);"></canvas>
     <div id="log"></div>
   </div>
-  <div id="version">v0.53-fix3 - Debug Logs</div>
+  <div id="version">v0.54 - Draw 21 Hand Points</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   
   <script>
     (function() {
       const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
       const startBtn = document.getElementById('startBtn');
       const statusEl = document.getElementById('status');
       const handInfo = document.getElementById('handInfo');
@@ -117,6 +120,14 @@
       function onResults(results) {
         resultCount++;
         
+        // 绘制视频帧
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(-1, 1);
+        ctx.translate(-canvas.width, 0);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        
         // 每30次回调记录一次
         if (resultCount % 30 === 0) {
           const hasMultiHandLandmarks = !!results.multiHandLandmarks;
@@ -129,11 +140,39 @@
         
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           const landmarks = results.multiHandLandmarks[0];
+          
+          // 绘制21个关键点
+          ctx.fillStyle = '#00ff00';
+          for (let i = 0; i < landmarks.length; i++) {
+            const x = landmarks[i].x * canvas.width;
+            const y = landmarks[i].y * canvas.height;
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          
+          // 绘制骨骼连线
+          const connections = [
+            [0,1],[1,2],[2,3],[3,4],           // 拇指
+            [0,5],[5,6],[6,7],[7,8],           // 食指
+            [0,9],[9,10],[10,11],[11,12],      // 中指
+            [0,13],[13,14],[14,15],[15,16],    // 无名指
+            [0,17],[17,18],[18,19],[19,20]     // 小指
+          ];
+          ctx.strokeStyle = '#00ffff';
+          ctx.lineWidth = 2;
+          for (const [start, end] of connections) {
+            ctx.beginPath();
+            ctx.moveTo(landmarks[start].x * canvas.width, landmarks[start].y * canvas.height);
+            ctx.lineTo(landmarks[end].x * canvas.width, landmarks[end].y * canvas.height);
+            ctx.stroke();
+          }
+          
           const wrist = landmarks[0];
           const x = Math.round(wrist.x * 100);
           const y = Math.round(wrist.y * 100);
           
-          handInfo.textContent = `Hand: ${x}%, ${y}%`;
+          handInfo.textContent = `Hand: ${x}%, ${y}% | 21 points`;
           
           const r = Math.round(wrist.x * 255);
           const g = Math.round((1 - wrist.y) * 128);
@@ -141,7 +180,7 @@
           document.body.style.background = `rgb(${r},${g},${b})`;
           
           if (resultCount % 30 === 0) {
-            log(`✓ Hand detected: ${x}%, ${y}%`);
+            log(`✓ Hand detected: ${x}%, ${y}%, 21 points drawn`);
           }
         } else {
           handInfo.textContent = 'No hand';
@@ -184,6 +223,7 @@
             await setupCamera();
             video.play();
             video.style.display = 'block';
+            canvas.style.display = 'block';
             log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
 
             // Init hands with selfie mode for front camera
@@ -233,6 +273,7 @@
           }
           hands = null;
           video.style.display = 'none';
+          canvas.style.display = 'none';
           statusEl.textContent = 'Off';
           statusEl.style.color = '#fff';
           startBtn.textContent = 'START CAMERA';

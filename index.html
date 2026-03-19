@@ -111,6 +111,7 @@
       }
 
       let resultCount = 0;
+      let lastResultTime = Date.now();
       
       // On results
       function onResults(results) {
@@ -121,7 +122,9 @@
           const hasMultiHandLandmarks = !!results.multiHandLandmarks;
           const isArray = Array.isArray(results.multiHandLandmarks);
           const length = results.multiHandLandmarks?.length || 0;
-          log(`Callback #${resultCount}: multiHandLandmarks=${hasMultiHandLandmarks}, isArray=${isArray}, length=${length}`);
+          const timeSinceLast = Date.now() - lastResultTime;
+          log(`#${resultCount}: hands=${length}, ms=${timeSinceLast}`);
+          lastResultTime = Date.now();
         }
         
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -196,12 +199,11 @@
             log('Setting options...');
             hands.setOptions({
               maxNumHands: 1,
-              modelComplexity: 1,
-              minDetectionConfidence: 0.5,
-              minTrackingConfidence: 0.5,
-              selfieMode: true
+              modelComplexity: 0,  // 轻量级模型
+              minDetectionConfidence: 0.1,  // 极低阈值
+              minTrackingConfidence: 0.1
             });
-            log('Options set');
+            log('Options set (threshold=0.1, light model)');
             
             log('Registering onResults callback...');
             hands.onResults(onResults);

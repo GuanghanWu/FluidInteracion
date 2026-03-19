@@ -1,6 +1,6 @@
 /**
  * Camera Hand Tracker
- * Version: 0.50 - 最简版，只检测手的位置改变背景颜色
+ * Version: 0.50-fix2 - 使用全局 MediaPipe
  */
 
 // DOM 元素
@@ -35,11 +35,10 @@ async function startCamera() {
   statusEl.style.color = '#ff0';
 
   try {
-    // 动态加载 MediaPipe
-    const [{ Hands }, { Camera }] = await Promise.all([
-      import('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/+esm'),
-      import('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/+esm')
-    ]);
+    // 检查 MediaPipe 是否加载
+    if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+      throw new Error('MediaPipe not loaded yet, please wait');
+    }
 
     statusEl.textContent = 'Initializing...';
 
@@ -50,7 +49,7 @@ async function startCamera() {
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 0, // 轻量级
+      modelComplexity: 0,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
@@ -78,6 +77,15 @@ async function startCamera() {
     statusEl.style.color = '#f00';
     console.error(error);
     cameraSwitch.classList.remove('active');
+    
+    // 如果 MediaPipe 没加载，3秒后重试
+    if (error.message.includes('not loaded')) {
+      setTimeout(() => {
+        if (cameraSwitch.classList.contains('active')) {
+          startCamera();
+        }
+      }, 3000);
+    }
   }
 }
 
@@ -103,16 +111,12 @@ function onResults(results) {
   if (!isCameraActive) return;
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    // 获取手腕位置 (landmark 0)
     const wrist = results.multiHandLandmarks[0][0];
-    const x = wrist.x; // 0-1
-    const y = wrist.y; // 0-1
+    const x = wrist.x;
+    const y = wrist.y;
 
-    // 更新显示
     handPosEl.textContent = `${(x * 100).toFixed(0)}%, ${(y * 100).toFixed(0)}%`;
 
-    // 根据坐标改变背景颜色
-    // X: 蓝色到红色, Y: 深色到亮色
     const r = Math.floor(x * 255);
     const g = Math.floor((1 - y) * 128);
     const b = Math.floor((1 - x) * 255);
@@ -120,7 +124,6 @@ function onResults(results) {
 
     document.body.style.background = color;
     bgColorEl.textContent = color;
-
   } else {
     handPosEl.textContent = 'Not detected';
     document.body.style.background = '#000';

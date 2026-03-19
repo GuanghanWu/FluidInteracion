@@ -107,6 +107,20 @@
       addLog('ERROR: Button not found');
     }
   </script>
-  <script src="/src/main.js"></script>
+  <script>
+    try {
+      addLog('Loading main.js...');
+    } catch(e) {
+      console.error(e);
+    }
+  </script>
+  <script src="/src/main.js" onload="addLog('main.js loaded')" onerror="addLog('ERROR: main.js failed to load')"></script>
+  <script>
+    try {
+      addLog('After main.js load attempt');
+    } catch(e) {
+      console.error(e);
+    }
+  </script>
 </body>
 </html>

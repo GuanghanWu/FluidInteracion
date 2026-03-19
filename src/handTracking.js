@@ -39,16 +39,28 @@ export async function initGestureRecognizer() {
     );
 
     logToPanel('info', '[Gesture] Creating recognizer...');
-    gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
-        delegate: 'GPU'
-      },
-      runningMode: 'VIDEO',
-      numHands: 1,
-      minHandDetectionConfidence: 0.3,
-      minHandPresenceConfidence: 0.3
-    });
+    try {
+      gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+          delegate: 'GPU'
+        },
+        runningMode: 'VIDEO',
+        numHands: 1
+      });
+      logToPanel('info', '[Gesture] GPU mode active');
+    } catch (gpuErr) {
+      logToPanel('warning', '[Gesture] GPU failed, trying CPU...');
+      gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+          delegate: 'CPU'
+        },
+        runningMode: 'VIDEO',
+        numHands: 1
+      });
+      logToPanel('info', '[Gesture] CPU mode active');
+    }
 
     logToPanel('info', '[Gesture] Ready!');
     return true;
@@ -81,7 +93,15 @@ export function detectGesture(video) {
   lastVideoTime = video.currentTime;
   
   try {
+    if (frameCount % 60 === 0) {
+      logToPanel('info', `[Gesture] Analyzing frame ${frameCount}...`);
+    }
     const results = gestureRecognizer.recognizeForVideo(video, performance.now());
+    if (frameCount % 60 === 0) {
+      const gestureCount = results.gestures?.length || 0;
+      const landmarkCount = results.landmarks?.length || 0;
+      logToPanel('info', `[Gesture] Results: ${gestureCount} gestures, ${landmarkCount} landmarks`);
+    }
     
     if (results.gestures && results.gestures.length > 0 && 
         results.landmarks && results.landmarks.length > 0) {

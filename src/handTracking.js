@@ -5,6 +5,8 @@ let gestureRecognizer = null;
 let isGestureLoading = false;
 let lastVideoTime = -1;
 let frameCount = 0;
+let processingCanvas = null;
+let processingCtx = null;
 
 // 辅助函数：写入 Debug Log 面板
 function logToPanel(level, msg) {
@@ -62,6 +64,13 @@ export async function initGestureRecognizer() {
       logToPanel('info', '[Gesture] CPU mode active');
     }
 
+    // 创建处理用的 canvas（解决镜像问题）
+    processingCanvas = document.createElement('canvas');
+    processingCanvas.width = 640;
+    processingCanvas.height = 480;
+    processingCtx = processingCanvas.getContext('2d');
+    logToPanel('info', '[Gesture] Processing canvas created');
+
     logToPanel('info', '[Gesture] Ready!');
     return true;
   } catch (err) {
@@ -85,18 +94,22 @@ export function detectGesture(video) {
     return null;
   }
   
-  // 每60帧打印视频信息
-  if (frameCount % 60 === 0) {
-    logToPanel('info', `[Gesture] Video: ${video.videoWidth}x${video.videoHeight}, playing: ${!video.paused}`);
-  }
-  
   lastVideoTime = video.currentTime;
   
   try {
+    // 将视频绘制到 canvas（不翻转，解决镜像问题）
+    if (processingCanvas && processingCtx) {
+      processingCtx.drawImage(video, 0, 0, processingCanvas.width, processingCanvas.height);
+    }
+    
     if (frameCount % 60 === 0) {
       logToPanel('info', `[Gesture] Analyzing frame ${frameCount}...`);
     }
-    const results = gestureRecognizer.recognizeForVideo(video, performance.now());
+    
+    // 使用 canvas 代替 video 传给 MediaPipe
+    const source = processingCanvas || video;
+    const results = gestureRecognizer.recognizeForVideo(source, performance.now());
+    
     if (frameCount % 60 === 0) {
       const gestureCount = results.gestures?.length || 0;
       const landmarkCount = results.landmarks?.length || 0;
@@ -135,4 +148,6 @@ export function disposeGestureRecognizer() {
     gestureRecognizer.close();
     gestureRecognizer = null;
   }
+  processingCanvas = null;
+  processingCtx = null;
 }

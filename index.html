@@ -199,11 +199,11 @@
             log('Setting options...');
             hands.setOptions({
               maxNumHands: 1,
-              modelComplexity: 0,  // 轻量级模型
-              minDetectionConfidence: 0.1,  // 极低阈值
-              minTrackingConfidence: 0.1
+              modelComplexity: 1,
+              minDetectionConfidence: 0.5,
+              minTrackingConfidence: 0.5
             });
-            log('Options set (threshold=0.1, light model)');
+            log('Options set (threshold=0.5)');
             
             log('Registering onResults callback...');
             hands.onResults(onResults);

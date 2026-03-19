@@ -1,7 +1,7 @@
 {
-  "name": "fluid-mvp",
-  "version": "1.0.0",
-  "description": "SPH Fluid Simulation with Three.js and Metaballs",
+  "name": "camera-hand-tracker",
+  "version": "0.50.0",
+  "description": "Camera hand tracking - change background color based on hand position",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.160.0",
     "vite": "^5.0.0"
   }
 }

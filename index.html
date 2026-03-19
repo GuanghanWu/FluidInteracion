@@ -96,7 +96,7 @@
     <canvas id="canvas" width="200" height="200"></canvas>
     <div id="log"></div>
   </div>
-  <div id="version">v0.62 - Stable Load</div>
+  <div id="version">v0.63 - Smooth Tracking</div>
 
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
@@ -158,6 +158,13 @@
         });
       }
 
+      // Smoothing variables
+      let lastX = 0.5, lastY = 0.5;  // 上一次有效坐标（归一化 0-1）
+      let missCount = 0;              // 连续未检测到的帧数
+      let hasHand = false;            // 当前是否有手
+      const SMOOTH_FACTOR = 0.3;      // 平滑系数（0-1，越大越跟手但越抖）
+      const MISS_THRESHOLD = 5;       // 连续丢帧5次才认为真的没手
+      
       // Detect and draw
       async function detect() {
         if (!isRunning || !model) return;
@@ -171,11 +178,19 @@
 
         // Detect hands
         const predictions = await model.estimateHands(video);
+        let detected = false;
+        let targetX = lastX, targetY = lastY;
 
         if (predictions.length > 0) {
           const hand = predictions[0];
           const landmarks = hand.landmarks;
           const palmBase = landmarks[0];
+          
+          // 获取目标坐标（归一化）
+          targetX = palmBase[0] / video.videoWidth;
+          targetY = palmBase[1] / video.videoHeight;
+          detected = true;
+          missCount = 0;
           
           // Draw landmarks (镜像坐标)
           ctx.fillStyle = '#00ff00';
@@ -186,16 +201,35 @@
             ctx.arc(canvas.width - x, y, 3, 0, 2 * Math.PI);
             ctx.fill();
           }
+        } else {
+          missCount++;
+        }
 
-          const x = Math.round((palmBase[0] / video.videoWidth) * 100);
-          const y = Math.round((palmBase[1] / video.videoHeight) * 100);
+        // 判断是否真的有手（防抖）
+        if (detected) {
+          hasHand = true;
+        } else if (missCount > MISS_THRESHOLD) {
+          hasHand = false;
+        }
+
+        // 平滑处理：如果检测到手或刚丢不久，做插值
+        if (hasHand) {
+          // 指数平滑：新值 = 旧值 * (1-α) + 目标值 * α
+          lastX = lastX * (1 - SMOOTH_FACTOR) + targetX * SMOOTH_FACTOR;
+          lastY = lastY * (1 - SMOOTH_FACTOR) + targetY * SMOOTH_FACTOR;
+          
+          const x = Math.round(lastX * 100);
+          const y = Math.round(lastY * 100);
           handInfo.textContent = `Hand: ${x}%, ${y}%`;
 
-          const r = Math.round((palmBase[0] / video.videoWidth) * 255);
-          const g = Math.round((1 - palmBase[1] / video.videoHeight) * 128);
-          const b = Math.round((1 - palmBase[0] / video.videoWidth) * 255);
+          const r = Math.round(lastX * 255);
+          const g = Math.round((1 - lastY) * 128);
+          const b = Math.round((1 - lastX) * 255);
           document.body.style.background = `rgb(${r},${g},${b})`;
         } else {
+          // 真的没手了，渐变回黑色
+          lastX = lastX * 0.9 + 0.5 * 0.1;  // 慢慢回到中心
+          lastY = lastY * 0.9 + 0.5 * 0.1;
           handInfo.textContent = 'No hand';
           document.body.style.background = '#000';
         }

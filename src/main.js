@@ -554,7 +554,9 @@ function setupControls() {
   
   // 摄像头开关
   document.getElementById('cameraToggle')?.addEventListener('change', (e) => {
+    console.log('[Camera] Toggle changed, checked:', e.target.checked);
     if (e.target.checked) {
+      console.log('[Camera] Calling startCamera()...');
       startCamera();
     } else {
       stopCamera();
@@ -756,6 +758,7 @@ function animate() {
 // ==================== 手势控制 (GestureRecognizer) ====================
 
 async function startCamera() {
+  console.log('[Camera] ========== startCamera() ENTERED ==========');
   const cameraToggle = document.getElementById('cameraToggle');
   const handStatus = document.getElementById('handStatus');
   const previewControl = document.getElementById('previewControl');
@@ -763,6 +766,7 @@ async function startCamera() {
   const cameraPreview = document.getElementById('cameraPreview');
   
   try {
+    console.log('[Camera] Initializing GestureRecognizer...');
     debugLog('info', 'Initializing GestureRecognizer...');
     const success = await initGestureRecognizer();
     if (!success) {

@@ -1,0 +1,14 @@
+{
+  "name": "fluid-simulation",
+  "version": "1.31.0",
+  "description": "Fluid Simulation with Three.js Metaballs and TensorFlow.js Hand Tracking",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

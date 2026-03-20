@@ -335,14 +335,30 @@
       }
     }
     
-    async function detectHands() {
+    // Frame skipping for gesture detection (30fps instead of 60fps)
+    let gestureFrameSkip = 0;
+    const GESTURE_SKIP_INTERVAL = 2; // Run every 2nd frame = 30fps at 60hz display
+    
+    async function detectHands(timestamp) {
       if (!isCameraRunning || !handModel) {
         rafId = null;
         return;
       }
       
-      // Prevent multiple RAF loops
-      if (rafId && rafId !== 'scheduled') return;
+      // Frame skipping to reduce GPU load
+      gestureFrameSkip++;
+      if (gestureFrameSkip < GESTURE_SKIP_INTERVAL) {
+        rafId = requestAnimationFrame(detectHands);
+        return;
+      }
+      gestureFrameSkip = 0;
+      
+      // Safety check: ensure video dimensions are valid
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.warn('Video dimensions not ready yet');
+        rafId = requestAnimationFrame(detectHands);
+        return;
+      }
       
       // Draw mirrored video
       cameraCtx.save();
@@ -351,53 +367,57 @@
       cameraCtx.drawImage(video, 0, 0, cameraCanvas.width, cameraCanvas.height);
       cameraCtx.restore();
       
-      const predictions = await handModel.estimateHands(video);
-      let targetX = handTracking.lastX;
-      let targetY = handTracking.lastY;
-      let detected = false;
-      
-      if (predictions.length > 0) {
-        const landmarks = predictions[0].landmarks;
-        const palmBase = landmarks[0];
+      try {
+        const predictions = await handModel.estimateHands(video);
+        let targetX = handTracking.lastX;
+        let targetY = handTracking.lastY;
+        let detected = false;
         
-        // Mirror X coordinate
-        targetX = 1 - (palmBase[0] / video.videoWidth);
-        targetY = palmBase[1] / video.videoHeight;
-        detected = true;
-        handTracking.missCount = 0;
-        
-        // Draw landmarks
-        cameraCtx.fillStyle = '#00ff00';
-        for (let i = 0; i < landmarks.length; i++) {
-          const x = landmarks[i][0] * (cameraCanvas.width / video.videoWidth);
-          const y = landmarks[i][1] * (cameraCanvas.height / video.videoHeight);
-          cameraCtx.beginPath();
-          cameraCtx.arc(cameraCanvas.width - x, y, 2, 0, 2 * Math.PI);
-          cameraCtx.fill();
+        if (predictions.length > 0) {
+          const landmarks = predictions[0].landmarks;
+          const palmBase = landmarks[0];
+          
+          // Mirror X coordinate (with safety check)
+          targetX = 1 - (palmBase[0] / video.videoWidth);
+          targetY = palmBase[1] / video.videoHeight;
+          detected = true;
+          handTracking.missCount = 0;
+          
+          // Draw landmarks
+          cameraCtx.fillStyle = '#00ff00';
+          for (let i = 0; i < landmarks.length; i++) {
+            const x = landmarks[i][0] * (cameraCanvas.width / video.videoWidth);
+            const y = landmarks[i][1] * (cameraCanvas.height / video.videoHeight);
+            cameraCtx.beginPath();
+            cameraCtx.arc(cameraCanvas.width - x, y, 2, 0, 2 * Math.PI);
+            cameraCtx.fill();
+          }
+        } else {
+          handTracking.missCount++;
         }
-      } else {
-        handTracking.missCount++;
-      }
-      
-      // Debounce
-      if (detected) {
-        handTracking.isDetected = true;
-      } else if (handTracking.missCount > MISS_THRESHOLD) {
-        handTracking.isDetected = false;
-      }
-      
-      // Smoothing
-      if (handTracking.isDetected) {
-        handTracking.lastX = handTracking.lastX * (1 - SMOOTH_FACTOR) + targetX * SMOOTH_FACTOR;
-        handTracking.lastY = handTracking.lastY * (1 - SMOOTH_FACTOR) + targetY * SMOOTH_FACTOR;
-        handTracking.x = handTracking.lastX;
-        handTracking.y = handTracking.lastY;
         
-        handPos.textContent = `Hand: ${Math.round(handTracking.x * 100)}%, ${Math.round(handTracking.y * 100)}%`;
-        handPos.style.color = '#0f0';
-      } else {
-        handPos.textContent = 'Hand: --';
-        handPos.style.color = '#ff0';
+        // Debounce
+        if (detected) {
+          handTracking.isDetected = true;
+        } else if (handTracking.missCount > MISS_THRESHOLD) {
+          handTracking.isDetected = false;
+        }
+        
+        // Smoothing
+        if (handTracking.isDetected) {
+          handTracking.lastX = handTracking.lastX * (1 - SMOOTH_FACTOR) + targetX * SMOOTH_FACTOR;
+          handTracking.lastY = handTracking.lastY * (1 - SMOOTH_FACTOR) + targetY * SMOOTH_FACTOR;
+          handTracking.x = handTracking.lastX;
+          handTracking.y = handTracking.lastY;
+          
+          handPos.textContent = `Hand: ${Math.round(handTracking.x * 100)}%, ${Math.round(handTracking.y * 100)}%`;
+          handPos.style.color = '#0f0';
+        } else {
+          handPos.textContent = 'Hand: --';
+          handPos.style.color = '#ff0';
+        }
+      } catch (err) {
+        console.error('Hand detection error:', err);
       }
       
       if (isCameraRunning) {

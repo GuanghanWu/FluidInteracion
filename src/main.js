@@ -742,10 +742,10 @@ async function initHandTracking() {
     await tf.setBackend('webgl');
     await tf.ready();
     
-    // 加载模型（带 30 秒超时）
+    // 加载模型（带 60 秒超时，模型文件约 20MB）
     const loadPromise = handpose.load();
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Model loading timeout (30s)')), 30000)
+      setTimeout(() => reject(new Error('模型加载超时 (60s)。请检查网络连接，或尝试使用代理访问。')), 60000)
     );
     
     handModel = await Promise.race([loadPromise, timeoutPromise]);

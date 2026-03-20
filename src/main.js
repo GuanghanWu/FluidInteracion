@@ -748,66 +748,6 @@ async function initHandTracking() {
   }
 }
 
-function onHandResults(results) {
-  const handStatus = document.getElementById('handStatus');
-  const handX = document.getElementById('handX');
-  const handY = document.getElementById('handY');
-  const handState = document.getElementById('handState');
-  
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    // 获取最靠近的手（第一个，因为 maxNumHands=1）
-    const landmarks = results.multiHandLandmarks[0];
-    
-    // 使用手腕 (index 0) 作为手的位置
-    // MediaPipe 坐标系: x[0-1] 左到右, y[0-1] 上到下
-    // 需要映射到屏幕坐标，然后转换到世界坐标
-    const wrist = landmarks[0];
-    const indexTip = landmarks[8];
-    const thumbTip = landmarks[4];
-    
-    // 镜像 X 坐标（摄像头是镜像的）
-    const screenX = (1 - wrist.x) * window.innerWidth;
-    const screenY = wrist.y * window.innerHeight;
-    
-    // 转换到世界坐标
-    const worldPos = screenToWorld(screenX, screenY);
-    handTracking.x = worldPos.x;
-    handTracking.y = worldPos.y;
-    handTracking.isDetected = true;
-    
-    // 检测捏合手势（拇指和食指距离）
-    const pinchDist = Math.sqrt(
-      Math.pow(indexTip.x - thumbTip.x, 2) + 
-      Math.pow(indexTip.y - thumbTip.y, 2)
-    );
-    handTracking.isPinching = pinchDist < 0.05;  // 阈值可调
-    handTracking.isOpen = pinchDist > 0.15;      // 张开阈值
-    
-    // 更新 UI 显示
-    if (handX) handX.textContent = screenX.toFixed(0);
-    if (handY) handY.textContent = screenY.toFixed(0);
-    if (handState) {
-      let state = 'Detected';
-      if (handTracking.isPinching) state += ' | Pinch';
-      else if (handTracking.isOpen) state += ' | Open';
-      handState.textContent = state;
-      handState.style.color = '#0ff';
-    }
-  } else {
-    // 没有检测到手
-    handTracking.isDetected = false;
-    handTracking.isPinching = false;
-    handTracking.isOpen = false;
-    
-    if (handState) {
-      handState.textContent = 'Waiting for hand...';
-      handState.style.color = '#888';
-    }
-    if (handX) handX.textContent = '--';
-    if (handY) handY.textContent = '--';
-  }
-}
-
 async function detectHands() {
   if (!isCameraActive || !handModel || !video) return;
   

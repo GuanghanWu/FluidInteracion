@@ -241,13 +241,21 @@
       }
     }
     
-    // Initialize particles
+    // Initialize or resize particle array (preserves existing particles)
     function initParticles() {
-      particles = [];
-      const count = Math.floor(BASE_PARTICLES * params.density);
-      for (let i = 0; i < count; i++) {
-        particles.push(new Particle());
+      const newCount = Math.floor(BASE_PARTICLES * params.density);
+      const oldCount = particles.length;
+      
+      if (newCount > oldCount) {
+        // Add new particles
+        for (let i = oldCount; i < newCount; i++) {
+          particles.push(new Particle());
+        }
+      } else if (newCount < oldCount) {
+        // Remove excess particles
+        particles.splice(newCount);
       }
+      // If same count, do nothing (preserves positions)
     }
     initParticles();
     
@@ -267,7 +275,6 @@
     const cameraPreview = document.getElementById('cameraPreview');
     const handPos = document.getElementById('handPos');
     const loadingStatus = document.getElementById('loadingStatus');
-    const statusEl = document.getElementById('status');
     
     let handModel = null;
     let isCameraRunning = false;
@@ -562,12 +569,10 @@
     // ============================================
     let lastTime = performance.now();
     let frameCount = 0;
-    let fpsTime = 0;
+    let lastFpsUpdate = performance.now();
     
     function animate() {
       const now = performance.now();
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
       
       // Clear
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -579,14 +584,13 @@
         particles[i].draw();
       }
       
-      // FPS counter
+      // FPS counter (fixed interval, no accumulation)
       frameCount++;
-      fpsTime += dt;
-      if (fpsTime >= 1) {
+      if (now - lastFpsUpdate >= 1000) {
         document.getElementById('fps').textContent = frameCount;
         document.getElementById('pcount').textContent = particles.length;
         frameCount = 0;
-        fpsTime = 0;
+        lastFpsUpdate = now;
       }
       
       requestAnimationFrame(animate);

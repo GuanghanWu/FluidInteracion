@@ -327,6 +327,27 @@ function updateParticleInstances() {
 }
 
 function setupControls() {
+  // Texture Size control
+  document.getElementById('texSize')?.addEventListener('change', (e) => {
+    const size = parseInt(e.target.value);
+    CONFIG.textureSize = size;
+    document.getElementById('texSizeVal').textContent = size;
+    
+    // Recreate RenderTarget with new size
+    if (metaballsRT) {
+      metaballsRT.dispose();
+      metaballsRT = new THREE.WebGLRenderTarget(size, size, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat
+      });
+      if (metaballsMesh?.material.uniforms.uTexture) {
+        metaballsMesh.material.uniforms.uTexture.value = metaballsRT.texture;
+      }
+    }
+    console.log('Texture size changed to:', size);
+  });
+  
   document.getElementById('density')?.addEventListener('input', (e) => {
     const density = parseFloat(e.target.value);
     CONFIG.density = density;

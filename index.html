@@ -128,6 +128,14 @@
     let mouseX = 0, mouseY = 0;
     let isMouseDown = false;
     
+    // Physics Constants
+    const INTERACTION_RADIUS = 150;      // Hand/mouse influence radius
+    const INTERACTION_MIN_DIST = 1;      // Minimum distance for force calculation
+    const PARTICLE_REPULSION_RADIUS = 20; // Particle-particle repulsion radius
+    const PARTICLE_REPULSION_FORCE = 0.5;
+    const BOUNCE_DAMPING = 0.8;          // Wall bounce velocity retention
+    const VISCOSITY_SCALE = 0.1;         // Viscosity multiplier
+    
     // Parameters
     let params = {
       density: 2.6,
@@ -137,11 +145,16 @@
       colors: ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']
     };
     
+    // Debounced resize handler
+    let resizeTimeout;
     function resize() {
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
     }
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resize, 100);
+    });
     resize();
     
     class Particle {
@@ -176,8 +189,8 @@
           const dx = targetX - this.x;
           const dy = targetY - this.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150 && dist > 1) {
-            const force = (150 - dist) / 150 * params.mouseForce;
+          if (dist < INTERACTION_RADIUS && dist > INTERACTION_MIN_DIST) {
+            const force = (INTERACTION_RADIUS - dist) / INTERACTION_RADIUS * params.mouseForce;
             this.vx += (dx / dist) * force;
             this.vy += (dy / dist) * force;
           }
@@ -185,29 +198,35 @@
         
         // Particle-particle interaction (simplified SPH)
         for (let j = 0; j < particles.length; j++) {
-          if (i === j) continue;
+          if (this === particles[j]) continue;
           const pj = particles[j];
           const dx = this.x - pj.x;
           const dy = this.y - pj.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 20 && dist > 0.1) {
-            const force = (20 - dist) / 20 * 0.5;
+          if (dist < PARTICLE_REPULSION_RADIUS && dist > 0.1) {
+            const force = (PARTICLE_REPULSION_RADIUS - dist) / PARTICLE_REPULSION_RADIUS * PARTICLE_REPULSION_FORCE;
             this.vx += (dx / dist) * force * 0.1;
             this.vy += (dy / dist) * force * 0.1;
           }
         }
         
         // Viscosity
-        this.vx *= (1 - params.viscosity * 0.1);
-        this.vy *= (1 - params.viscosity * 0.1);
+        this.vx *= (1 - params.viscosity * VISCOSITY_SCALE);
+        this.vy *= (1 - params.viscosity * VISCOSITY_SCALE);
         
         // Update position
         this.x += this.vx;
         this.y += this.vy;
         
-        // Boundary
-        if (this.x < 0 || this.x > width) { this.vx *= -0.8; this.x = Math.max(0, Math.min(width, this.x)); }
-        if (this.y < 0 || this.y > height) { this.vy *= -0.8; this.y = Math.max(0, Math.min(height, this.y)); }
+        // Boundary with damping
+        if (this.x < 0 || this.x > width) { 
+          this.vx *= -BOUNCE_DAMPING; 
+          this.x = Math.max(0, Math.min(width, this.x)); 
+        }
+        if (this.y < 0 || this.y > height) { 
+          this.vy *= -BOUNCE_DAMPING; 
+          this.y = Math.max(0, Math.min(height, this.y)); 
+        }
       }
       
       draw() {
@@ -273,8 +292,11 @@
       try {
         await new Promise(r => setTimeout(r, 500)); // Wait for CDN
         
-        if (typeof tf === 'undefined' || typeof handpose === 'undefined') {
-          throw new Error('Libraries not loaded');
+        if (typeof tf === 'undefined') {
+          throw new Error('TensorFlow.js not loaded from CDN');
+        }
+        if (typeof handpose === 'undefined') {
+          throw new Error('Handpose model not loaded from CDN');
         }
         
         handModel = await handpose.load();
@@ -283,24 +305,44 @@
         cameraToggleContainer.style.opacity = '1';
         
       } catch (err) {
-        loadingStatus.innerHTML = '✗ Failed: ' + err.message;
+        console.error('Hand tracking init failed:', err);
+        loadingStatus.innerHTML = '✗ Failed: ' + (err.message || 'Unknown error');
         loadingStatus.style.color = '#f00';
+        cameraToggleContainer.style.opacity = '0.5';
+        cameraToggleContainer.style.cursor = 'not-allowed';
       }
     }
     
     async function setupCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 480, height: 480 },
-        audio: false
-      });
-      video.srcObject = stream;
-      return new Promise((resolve) => {
-        video.onloadedmetadata = () => resolve(video);
-      });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 480, height: 480 },
+          audio: false
+        });
+        video.srcObject = stream;
+        return new Promise((resolve, reject) => {
+          video.onloadedmetadata = () => resolve(video);
+          video.onerror = (err) => reject(new Error('Video load error: ' + err.message));
+          setTimeout(() => reject(new Error('Video load timeout')), 5000);
+        });
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          throw new Error('Camera permission denied');
+        } else if (err.name === 'NotFoundError') {
+          throw new Error('No camera found');
+        }
+        throw err;
+      }
     }
     
     async function detectHands() {
-      if (!isCameraRunning || !handModel) return;
+      if (!isCameraRunning || !handModel) {
+        rafId = null;
+        return;
+      }
+      
+      // Prevent multiple RAF loops
+      if (rafId && rafId !== 'scheduled') return;
       
       // Draw mirrored video
       cameraCtx.save();
@@ -358,38 +400,65 @@
         handPos.style.color = '#ff0';
       }
       
-      rafId = requestAnimationFrame(detectHands);
+      if (isCameraRunning) {
+        rafId = requestAnimationFrame(detectHands);
+      } else {
+        rafId = null;
+      }
     }
     
     async function startCamera() {
+      if (isCameraRunning) return; // Prevent double start
+      
       try {
         await setupCamera();
-        video.play();
+        await video.play();
         cameraPreview.style.display = 'block';
         isCameraRunning = true;
         cameraToggle.classList.add('active');
         detectHands();
       } catch (err) {
+        console.error('Camera start failed:', err);
         alert('Camera error: ' + err.message);
-        cameraToggle.classList.remove('active');
+        stopCamera(); // Ensure cleanup
       }
     }
     
     function stopCamera() {
+      if (!isCameraRunning && rafId === null) return; // Already stopped
+      
       isCameraRunning = false;
-      if (rafId) cancelAnimationFrame(rafId);
+      
+      // Cancel RAF
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
+      // Stop video tracks
       if (video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
         video.srcObject = null;
       }
+      
+      // Pause video element
+      video.pause();
+      
+      // Clear canvas
+      cameraCtx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+      
       cameraPreview.style.display = 'none';
       cameraToggle.classList.remove('active');
       handTracking.isDetected = false;
+      handTracking.missCount = 0;
       handPos.textContent = 'Hand: --';
     }
     
     cameraToggleContainer.addEventListener('click', () => {
-      if (!handModel) return;
+      if (!handModel) {
+        console.warn('Camera toggle clicked but model not ready');
+        return;
+      }
       if (isCameraRunning) {
         stopCamera();
       } else {
@@ -408,24 +477,31 @@
       });
     });
     
+    // Helper for safe number parsing
+    function safeParseFloat(value, defaultValue, min, max) {
+      const parsed = parseFloat(value);
+      if (isNaN(parsed)) return defaultValue;
+      return Math.max(min, Math.min(max, parsed));
+    }
+    
     document.getElementById('density').addEventListener('input', (e) => {
-      params.density = parseFloat(e.target.value);
+      params.density = safeParseFloat(e.target.value, 2.6, 0.5, 5.0);
       document.getElementById('densityVal').textContent = params.density.toFixed(1);
       initParticles();
     });
     
     document.getElementById('particleSize').addEventListener('input', (e) => {
-      params.particleSize = parseFloat(e.target.value);
+      params.particleSize = safeParseFloat(e.target.value, 1.4, 0.5, 3.0);
       document.getElementById('sizeVal').textContent = params.particleSize.toFixed(1);
     });
     
     document.getElementById('viscosity').addEventListener('input', (e) => {
-      params.viscosity = parseFloat(e.target.value);
+      params.viscosity = safeParseFloat(e.target.value, 0.25, 0.05, 0.5);
       document.getElementById('viscosityVal').textContent = params.viscosity.toFixed(2);
     });
     
     document.getElementById('mouseForce').addEventListener('input', (e) => {
-      params.mouseForce = parseFloat(e.target.value);
+      params.mouseForce = safeParseFloat(e.target.value, 4.0, 1.0, 10.0);
       document.getElementById('forceVal').textContent = params.mouseForce.toFixed(1);
     });
     
@@ -442,16 +518,24 @@
     });
     canvas.addEventListener('mousedown', () => isMouseDown = true);
     canvas.addEventListener('mouseup', () => isMouseDown = false);
+    canvas.addEventListener('mouseleave', () => isMouseDown = false);
+    
+    // Touch events with preventDefault to stop page scrolling
     canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
       isMouseDown = true;
       mouseX = e.touches[0].clientX;
       mouseY = e.touches[0].clientY;
-    });
-    canvas.addEventListener('touchend', () => isMouseDown = false);
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      isMouseDown = false;
+    }, { passive: false });
     canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
       mouseX = e.touches[0].clientX;
       mouseY = e.touches[0].clientY;
-    });
+    }, { passive: false });
     
     // ============================================
     // MAIN LOOP
@@ -471,7 +555,7 @@
       
       // Update and draw particles
       for (let i = 0; i < particles.length; i++) {
-        particles[i].update(i);
+        particles[i].update();
         particles[i].draw();
       }
       

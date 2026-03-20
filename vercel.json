@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "public": true,
+  "github": {
+    "enabled": true
+  },
   "builds": [
     {
       "src": "index.html",
@@ -9,6 +13,9 @@
   "routes": [
     {
       "src": "/src/(.*)",
+      "headers": {
+        "Content-Type": "application/javascript"
+      },
       "dest": "/src/$1"
     },
     {

@@ -60,6 +60,91 @@
     .color-row { display: flex; gap: 8px; margin-bottom: 6px; }
     .color-row label { flex: 1; font-size: 10px; }
     
+    /* Sub-accordion styles from v0.41 */
+    .sub-accordion {
+      margin: 6px 0;
+      border-left: 2px solid rgba(0, 255, 255, 0.3);
+      padding-left: 8px;
+    }
+    .sub-header {
+      font-size: 11px;
+      color: #0ff;
+      cursor: pointer;
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.8;
+    }
+    .sub-header:hover { opacity: 1; }
+    .sub-header::after { content: '▼'; font-size: 8px; }
+    .sub-header.collapsed::after { content: '▶'; }
+    .sub-content { display: block; padding: 4px 0 4px 8px; }
+    .sub-content.collapsed { display: none; }
+    .sub-control { margin-bottom: 6px; }
+    .sub-control label {
+      font-size: 10px;
+      color: #aaa;
+      margin-bottom: 2px;
+      display: block;
+    }
+    .sub-control input[type="range"] { width: 100%; height: 12px; }
+    .sub-control select {
+      width: 100%;
+      padding: 3px 6px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #0ff;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 3px;
+      font-size: 10px;
+    }
+    
+    /* Color dots grid */
+    .color-grid {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+    }
+    .color-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-dot:hover { transform: scale(1.1); border-color: #0ff; }
+    .color-dot.active { border-color: #0ff; box-shadow: 0 0 8px rgba(0, 255, 255, 0.5); }
+    .color-dot.hidden { display: none; }
+    
+    /* HSV Panel */
+    .hsv-panel {
+      display: none;
+      padding: 8px;
+      background: rgba(0, 30, 40, 0.8);
+      border-radius: 4px;
+      margin-top: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+    }
+    .hsv-panel.show { display: block; }
+    .hsv-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .hsv-row:last-child { margin-bottom: 0; }
+    .hsv-row span {
+      width: 16px;
+      font-size: 10px;
+      color: #0ff;
+      text-align: center;
+    }
+    .hsv-row input[type="range"] {
+      flex: 1;
+      height: 14px;
+    }
+    
     #version { position: absolute; bottom: 10px; right: 10px; color: #0ff; font-size: 11px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 3px; z-index: 100; }
   </style>
 </head>
@@ -82,34 +167,75 @@
       </div>
     </div>
     
+    <!-- Physics Panel -->
     <div class="accordion">
-      <div class="accordion-header collapsed" data-target="visualPanel">Visual</div>
-      <div class="accordion-content collapsed" id="visualPanel">
-        <div class="control-group"><label>Density: <span id="densityVal">2.6</span>x</label><input type="range" id="density" min="0.5" max="5" step="0.1" value="2.6"></div>
-        <div class="control-group"><label>Particle Size: <span id="sizeVal">1.4</span></label><input type="range" id="particleSize" min="0.5" max="3" step="0.1" value="1.4"></div>
+      <div class="accordion-header collapsed" data-target="physicsPanel">Physics</div>
+      <div class="accordion-content collapsed" id="physicsPanel">
         <div class="control-group"><label>Viscosity: <span id="viscosityVal">0.25</span></label><input type="range" id="viscosity" min="0.05" max="0.5" step="0.05" value="0.25"></div>
         <div class="control-group"><label>Mouse Force: <span id="forceVal">4.0</span></label><input type="range" id="mouseForce" min="1" max="10" step="0.5" value="4.0"></div>
       </div>
     </div>
     
+    <!-- Visual Panel with sub-accordions -->
     <div class="accordion">
-      <div class="accordion-header collapsed" data-target="colorPanel">Colors</div>
-      <div class="accordion-content collapsed" id="colorPanel">
-        <div class="color-row">
-          <label>Color 1:<input type="color" id="color1" value="#00ffff"></label>
-          <label>Color 2:<input type="color" id="color2" value="#ff00ff"></label>
+      <div class="accordion-header collapsed" data-target="visualPanel">Visual</div>
+      <div class="accordion-content collapsed" id="visualPanel">
+        <div class="control-group"><label>Density: <span id="densityVal">2.6</span>x</label><input type="range" id="density" min="0.5" max="5" step="0.1" value="2.6"></div>
+        <div class="control-group"><label>Particle Size: <span id="sizeVal">1.4</span></label><input type="range" id="particleSize" min="0.5" max="3" step="0.1" value="1.4"></div>
+        
+        <!-- Colors Sub-accordion -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="colorsSub">Colors</div>
+          <div class="sub-content collapsed" id="colorsSub">
+            <div class="sub-control">
+              <label>Layers: <span id="colorLayersVal">4</span></label>
+              <input type="range" id="colorLayers" min="1" max="4" value="4" step="1">
+            </div>
+            <div class="color-grid">
+              <div class="color-dot active" id="colorDot1" style="background: #00ffff;" title="Color 1 (Edge)"></div>
+              <div class="color-dot" id="colorDot2" style="background: #ff00ff;" title="Color 2"></div>
+              <div class="color-dot" id="colorDot3" style="background: #ffff00;" title="Color 3"></div>
+              <div class="color-dot" id="colorDot4" style="background: #00ff00;" title="Color 4 (Center)"></div>
+            </div>
+            <div class="hsv-panel" id="hsvPanel">
+              <div class="hsv-row"><span>H</span><input type="range" id="hsvH" min="0" max="360" value="180"></div>
+              <div class="hsv-row"><span>S</span><input type="range" id="hsvS" min="0" max="100" value="100"></div>
+              <div class="hsv-row"><span>V</span><input type="range" id="hsvV" min="0" max="100" value="100"></div>
+            </div>
+          </div>
         </div>
-        <div class="color-row">
-          <label>Color 3:<input type="color" id="color3" value="#ffff00"></label>
-          <label>Color 4:<input type="color" id="color4" value="#00ff00"></label>
+        
+        <!-- Random Sub-accordion -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="randomSub">Random</div>
+          <div class="sub-content collapsed" id="randomSub">
+            <div class="sub-control">
+              <label>Algorithm</label>
+              <select id="randomAlgo">
+                <option value="none">None</option>
+                <option value="perlin" selected>Perlin Noise</option>
+                <option value="simplex">Simplex Noise</option>
+                <option value="white">White Noise</option>
+              </select>
+            </div>
+            <div class="sub-control">
+              <label>Scale: <span id="randomScaleVal">1.4</span></label>
+              <input type="range" id="randomScale" min="0.1" max="3.0" value="1.4" step="0.1">
+            </div>
+            <div class="sub-control">
+              <label>Intensity: <span id="randomIntensityVal">0.70</span></label>
+              <input type="range" id="randomIntensity" min="0" max="1.0" value="0.70" step="0.05">
+            </div>
+          </div>
         </div>
+        
       </div>
     </div>
     
     <div id="status">FPS: <span id="fps">--</span> | Particles: <span id="pcount">--</span></div>
   </div>
   
-  <div id="version">v1.0 - Fluid + Hand Tracking</div>
+  <div id="version">v1.2 - Enhanced Visuals</div>
 
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
@@ -136,14 +262,96 @@
     const BOUNCE_DAMPING = 0.8;          // Wall bounce velocity retention
     const VISCOSITY_SCALE = 0.1;         // Viscosity multiplier
     
-    // Parameters
+    // Parameters (aligned with v0.41)
     let params = {
       density: 2.6,
       particleSize: 1.4,
       viscosity: 0.25,
       mouseForce: 4.0,
-      colors: ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']
+      colors: ['#00ffff', '#ff00ff', '#ffff00', '#00ff00'],
+      colorLayers: 4,
+      randomAlgo: 'perlin',
+      randomScale: 1.4,
+      randomIntensity: 0.70
     };
+    
+    // Active color index for HSV editing (1-4)
+    let activeColorIndex = 1;
+    
+    // ============================================
+    // NOISE FUNCTIONS (from v0.41)
+    // ============================================
+    function noise(x, y, seed = 0) {
+      const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+      return n - Math.floor(n);
+    }
+    
+    function perlinNoise(x, y, scale = 1) {
+      const X = Math.floor(x * scale);
+      const Y = Math.floor(y * scale);
+      const fx = (x * scale) - X;
+      const fy = (y * scale) - Y;
+      
+      const n00 = noise(X, Y);
+      const n10 = noise(X + 1, Y);
+      const n01 = noise(X, Y + 1);
+      const n11 = noise(X + 1, Y + 1);
+      
+      const u = fx * fx * (3 - 2 * fx);
+      const v = fy * fy * (3 - 2 * fy);
+      
+      return (1 - u) * (1 - v) * n00 + u * (1 - v) * n10 + (1 - u) * v * n01 + u * v * n11;
+    }
+    
+    function simplexNoise(x, y, scale = 1) {
+      // Simplified Simplex using Perlin
+      return perlinNoise(x, y, scale);
+    }
+    
+    function getNoiseValue(x, y, algo, scale) {
+      switch (algo) {
+        case 'perlin': return perlinNoise(x, y, scale);
+        case 'simplex': return simplexNoise(x, y, scale);
+        case 'white': return noise(x * scale, y * scale);
+        default: return 0.5;
+      }
+    }
+    
+    // ============================================
+    // HSV COLOR UTILITIES
+    // ============================================
+    function hsvToHex(h, s, v) {
+      s /= 100;
+      v /= 100;
+      const c = v * s;
+      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      const m = v - c;
+      let r, g, b;
+      if (h < 60) [r, g, b] = [c, x, 0];
+      else if (h < 120) [r, g, b] = [x, c, 0];
+      else if (h < 180) [r, g, b] = [0, c, x];
+      else if (h < 240) [r, g, b] = [0, x, c];
+      else if (h < 300) [r, g, b] = [x, 0, c];
+      else [r, g, b] = [c, 0, x];
+      const toHex = (n) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+    
+    function hexToHsv(hex) {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0, s = max === 0 ? 0 : d / max, v = max;
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d + 6) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+      }
+      return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
+    }
     
     // ============================================
     // DYNAMIC SPATIAL GRID (for particle interaction)
@@ -347,12 +555,27 @@
       
       draw() {
         const size = this.radius * params.particleSize;
-        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size);
-        gradient.addColorStop(0, params.colors[this.color]);
+        
+        // Apply noise to size if enabled
+        let finalSize = size;
+        if (params.randomAlgo !== 'none') {
+          const n = getNoiseValue(this.x * 0.01, this.y * 0.01, params.randomAlgo, params.randomScale);
+          const variation = (n - 0.5) * 2 * params.randomIntensity;
+          finalSize = size * (1 + variation);
+        }
+        
+        // Multi-layer color gradient based on colorLayers setting
+        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, finalSize);
+        
+        // Determine which color to use based on layer index
+        const layerIndex = this.color % params.colorLayers;
+        const color = params.colors[layerIndex];
+        
+        gradient.addColorStop(0, color);
         gradient.addColorStop(1, 'transparent');
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, finalSize, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -648,11 +871,118 @@
       document.getElementById('forceVal').textContent = params.mouseForce.toFixed(1);
     });
     
-    ['color1', 'color2', 'color3', 'color4'].forEach((id, i) => {
-      document.getElementById(id).addEventListener('input', (e) => {
-        params.colors[i] = e.target.value;
+    // ============================================
+    // SUB-ACCORDION CONTROLS
+    // ============================================
+    document.querySelectorAll('.sub-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const target = header.dataset.sub;
+        const content = document.getElementById(target);
+        header.classList.toggle('collapsed');
+        content?.classList.toggle('collapsed');
       });
     });
+    
+    // ============================================
+    // COLOR LAYERS CONTROL
+    // ============================================
+    function updateColorLayers() {
+      const layers = params.colorLayers;
+      document.getElementById('colorLayersVal').textContent = layers;
+      
+      // Show/hide color dots based on layer count
+      for (let i = 1; i <= 4; i++) {
+        const dot = document.getElementById(`colorDot${i}`);
+        if (dot) {
+          dot.style.display = i <= layers ? 'block' : 'none';
+          if (i > layers) dot.classList.remove('active');
+        }
+      }
+      
+      // Update active color index if it's now hidden
+      if (activeColorIndex > layers) {
+        activeColorIndex = 1;
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        document.getElementById('colorDot1')?.classList.add('active');
+        updateHSVPanel();
+      }
+    }
+    
+    document.getElementById('colorLayers').addEventListener('input', (e) => {
+      params.colorLayers = parseInt(e.target.value);
+      updateColorLayers();
+    });
+    
+    // ============================================
+    // COLOR DOTS & HSV PANEL
+    // ============================================
+    const colorDots = [1, 2, 3, 4].map(i => document.getElementById(`colorDot${i}`));
+    const hsvPanel = document.getElementById('hsvPanel');
+    const hsvH = document.getElementById('hsvH');
+    const hsvS = document.getElementById('hsvS');
+    const hsvV = document.getElementById('hsvV');
+    
+    function updateHSVPanel() {
+      const hsv = hexToHsv(params.colors[activeColorIndex - 1]);
+      hsvH.value = hsv.h;
+      hsvS.value = hsv.s;
+      hsvV.value = hsv.v;
+    }
+    
+    function updateActiveColor() {
+      const hex = hsvToHex(parseInt(hsvH.value), parseInt(hsvS.value), parseInt(hsvV.value));
+      params.colors[activeColorIndex - 1] = hex;
+      const dot = document.getElementById(`colorDot${activeColorIndex}`);
+      if (dot) dot.style.background = hex;
+    }
+    
+    colorDots.forEach((dot, i) => {
+      if (!dot) return;
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Update active state
+        colorDots.forEach(d => d?.classList.remove('active'));
+        dot.classList.add('active');
+        activeColorIndex = i + 1;
+        // Show HSV panel
+        hsvPanel?.classList.add('show');
+        updateHSVPanel();
+      });
+    });
+    
+    // HSV slider events
+    hsvH?.addEventListener('input', updateActiveColor);
+    hsvS?.addEventListener('input', updateActiveColor);
+    hsvV?.addEventListener('input', updateActiveColor);
+    
+    // Close HSV panel when clicking elsewhere
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.color-grid') && !e.target.closest('.hsv-panel')) {
+        hsvPanel?.classList.remove('show');
+        colorDots.forEach(d => d?.classList.remove('active'));
+      }
+    });
+    
+    // ============================================
+    // RANDOM NOISE CONTROLS
+    // ============================================
+    document.getElementById('randomAlgo').addEventListener('change', (e) => {
+      params.randomAlgo = e.target.value;
+    });
+    
+    document.getElementById('randomScale').addEventListener('input', (e) => {
+      params.randomScale = safeParseFloat(e.target.value, 1.4, 0.1, 3.0);
+      document.getElementById('randomScaleVal').textContent = params.randomScale.toFixed(1);
+    });
+    
+    document.getElementById('randomIntensity').addEventListener('input', (e) => {
+      params.randomIntensity = safeParseFloat(e.target.value, 0.70, 0, 1.0);
+      document.getElementById('randomIntensityVal').textContent = params.randomIntensity.toFixed(2);
+    });
+    
+    // Initialize
+    updateColorLayers();
     
     // Mouse events
     canvas.addEventListener('mousemove', (e) => {

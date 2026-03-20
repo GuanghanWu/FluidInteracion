@@ -718,6 +718,12 @@ async function initHandTracking() {
   const cameraLoading = document.getElementById('cameraLoading');
   const cameraError = document.getElementById('cameraError');
   
+  // 如果模型已存在，直接返回
+  if (handModel) {
+    console.log('Using cached handpose model');
+    return true;
+  }
+  
   if (cameraLoading) cameraLoading.style.display = 'block';
   if (cameraError) cameraError.style.display = 'none';
   
@@ -732,6 +738,10 @@ async function initHandTracking() {
       throw new Error('Handpose model not loaded from CDN');
     }
     
+    // 配置 TensorFlow.js 使用 IndexedDB 缓存
+    await tf.setBackend('webgl');
+    await tf.ready();
+    
     // 加载模型（带 30 秒超时）
     const loadPromise = handpose.load();
     const timeoutPromise = new Promise((_, reject) => 
@@ -739,6 +749,7 @@ async function initHandTracking() {
     );
     
     handModel = await Promise.race([loadPromise, timeoutPromise]);
+    console.log('Handpose model loaded and cached');
     
     if (cameraLoading) cameraLoading.style.display = 'none';
     
@@ -780,9 +791,19 @@ async function detectHands() {
       const landmarks = predictions[0].landmarks;
       const palmBase = landmarks[0];
       
-      // Mirror X coordinate
-      const normalizedX = 1 - (palmBase[0] / video.videoWidth);
-      const normalizedY = palmBase[1] / video.videoHeight;
+      // Safety check for video dimensions
+      if (!video.videoWidth || !video.videoHeight) {
+        console.warn('Video dimensions not ready');
+        return;
+      }
+      
+      // Mirror X coordinate (safely)
+      const rawX = palmBase[0] / video.videoWidth;
+      const rawY = palmBase[1] / video.videoHeight;
+      
+      // Clamp to valid range
+      const normalizedX = Math.max(0, Math.min(1, 1 - rawX));
+      const normalizedY = Math.max(0, Math.min(1, rawY));
       
       // Smoothing
       handTracking.lastX = handTracking.lastX * (1 - 0.3) + normalizedX * 0.3;
@@ -823,6 +844,8 @@ async function detectHands() {
 async function startCamera() {
   const cameraToggle = document.getElementById('cameraToggle');
   const handStatus = document.getElementById('handStatus');
+  const cameraPreview = document.getElementById('cameraPreview');
+  const previewVideo = document.getElementById('handVideo');
   
   if (!handModel) {
     const success = await initHandTracking();
@@ -833,10 +856,13 @@ async function startCamera() {
   }
   
   try {
-    video = document.createElement('video');
-    video.setAttribute('playsinline', '');
-    video.style.display = 'none';
-    document.body.appendChild(video);
+    // 使用页面上的 video 元素作为预览
+    if (previewVideo) {
+      video = previewVideo;
+    } else {
+      video = document.createElement('video');
+      video.setAttribute('playsinline', '');
+    }
     
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 480, height: 480 },
@@ -847,10 +873,11 @@ async function startCamera() {
     await new Promise((resolve) => {
       video.onloadedmetadata = () => resolve();
     });
-    video.play();
+    await video.play();
     
     isCameraActive = true;
     if (handStatus) handStatus.style.display = 'block';
+    if (cameraPreview) cameraPreview.style.display = 'block';
     detectHands();
     
     console.log('Camera started');
@@ -864,6 +891,7 @@ async function startCamera() {
 
 function stopCamera() {
   const handStatus = document.getElementById('handStatus');
+  const cameraPreview = document.getElementById('cameraPreview');
   
   isCameraActive = false;
   handTracking.isDetected = false;
@@ -880,6 +908,7 @@ function stopCamera() {
   }
   
   if (handStatus) handStatus.style.display = 'none';
+  if (cameraPreview) cameraPreview.style.display = 'none';
   console.log('Camera stopped');
 }
 

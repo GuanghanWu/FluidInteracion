@@ -774,15 +774,25 @@ async function detectHands() {
       const landmarks = predictions[0].landmarks;
       const palmBase = landmarks[0];
       
-      // Safety check for video dimensions
+      // Safety check for video dimensions and landmark data
       if (!video.videoWidth || !video.videoHeight) {
         console.warn('Video dimensions not ready');
+        return;
+      }
+      if (!palmBase || typeof palmBase[0] !== 'number' || typeof palmBase[1] !== 'number') {
+        console.warn('Invalid landmark data');
         return;
       }
       
       // Mirror X coordinate (safely)
       const rawX = palmBase[0] / video.videoWidth;
       const rawY = palmBase[1] / video.videoHeight;
+      
+      // Check for NaN/Infinity
+      if (!isFinite(rawX) || !isFinite(rawY)) {
+        console.warn('Invalid coordinates:', rawX, rawY);
+        return;
+      }
       
       // Clamp to valid range
       const normalizedX = Math.max(0, Math.min(1, 1 - rawX));
@@ -805,7 +815,30 @@ async function detectHands() {
         handState.textContent = 'Detected';
         handState.style.color = '#0ff';
       }
+      
+      // Draw landmarks on canvas
+      const handCanvas = document.getElementById('handCanvas');
+      if (handCanvas) {
+        const ctx = handCanvas.getContext('2d');
+        ctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+        
+        // Draw each landmark
+        ctx.fillStyle = '#0ff';
+        for (const point of landmarks) {
+          const lx = (1 - point[0] / video.videoWidth) * handCanvas.width;
+          const ly = point[1] / video.videoHeight * handCanvas.height;
+          ctx.beginPath();
+          ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     } else {
+      // Clear canvas when no hand detected
+      const handCanvas = document.getElementById('handCanvas');
+      if (handCanvas) {
+        const ctx = handCanvas.getContext('2d');
+        ctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+      }
       handTracking.missCount++;
       if (handTracking.missCount > 5) {
         handTracking.isDetected = false;

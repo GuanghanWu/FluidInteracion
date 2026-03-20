@@ -381,7 +381,10 @@
         </div>
         <!-- Camera Preview -->
         <div class="control-group" id="cameraPreview" style="display: none; text-align: center;">
-          <video id="handVideo" width="200" height="150" autoplay playsinline muted style="border: 1px solid #0ff; border-radius: 4px;"></video>
+          <div style="position: relative; display: inline-block;">
+            <video id="handVideo" width="200" height="150" autoplay playsinline muted style="border: 1px solid #0ff; border-radius: 4px;"></video>
+            <canvas id="handCanvas" width="200" height="150" style="position: absolute; top: 0; left: 0; border: 1px solid #0ff; border-radius: 4px; pointer-events: none;"></canvas>
+          </div>
         </div>
         <div class="control-group" id="handStatus" style="display: none;">
           <label>Hand Position:</label>

@@ -3,333 +3,494 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hand Tracking - TensorFlow.js</title>
+  <title>Fluid Simulation v1.0 - Hand Tracking</title>
   <style>
-    body { 
-      margin: 0; 
-      background: #000; 
-      font-family: monospace;
-      transition: background 0.1s;
-      overflow: hidden;
-    }
-    #container {
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+    #mainCanvas { display: block; }
+    
+    #controls {
       position: absolute;
       top: 10px;
       left: 10px;
       background: rgba(0,10,20,0.9);
       border: 1px solid #0ff;
       border-radius: 8px;
-      padding: 10px;
+      padding: 15px;
       color: #0ff;
-      max-width: 300px;
-      z-index: 10;
-    }
-    button {
-      background: #0ff;
-      color: #000;
-      border: none;
-      padding: 8px 16px;
       font-family: monospace;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 10px;
-    }
-    button:disabled {
-      background: #666;
-      color: #999;
-      cursor: not-allowed;
-    }
-    #loadingStatus {
-      color: #ff0;
       font-size: 12px;
-      margin-bottom: 10px;
-    }
-    .spinner {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 2px solid #0ff;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-right: 5px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    #canvas {
-      width: 200px;
-      height: 200px;
-      border: 1px solid #0ff;
-      display: none;
-      margin-top: 10px;
-    }
-    #log {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #0ff;
-      font-size: 11px;
-      color: #fff;
-      max-height: 150px;
+      min-width: 260px;
+      max-height: 90vh;
       overflow-y: auto;
+      z-index: 100;
     }
-    #handInfo {
-      margin-top: 5px;
-      color: #ff0;
-    }
-    #version {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      color: #0ff;
-      font-size: 12px;
-      z-index: 10;
-    }
+    
+    .accordion { margin-bottom: 10px; border: 1px solid rgba(0,255,255,0.3); border-radius: 4px; }
+    .accordion-header { background: rgba(0,80,100,0.5); padding: 8px; cursor: pointer; display: flex; justify-content: space-between; }
+    .accordion-header::after { content: '▼'; font-size: 10px; }
+    .accordion-header.collapsed::after { content: '▶'; }
+    .accordion-content { padding: 10px; }
+    .accordion-content.collapsed { display: none; }
+    
+    .control-group { margin-bottom: 8px; }
+    .control-group label { display: block; margin-bottom: 3px; color: #fff; font-size: 11px; }
+    .control-group input[type="range"] { width: 100%; }
+    .control-group input[type="color"] { width: 100%; height: 28px; border: none; border-radius: 4px; }
+    
+    button { background: #0ff; color: #000; border: none; padding: 8px 16px; font-family: monospace; font-weight: bold; cursor: pointer; border-radius: 4px; margin-bottom: 8px; width: 100%; }
+    button:disabled { background: #666; color: #999; cursor: not-allowed; }
+    
+    #cameraPreview { width: 150px; height: 150px; border: 1px solid #0ff; display: none; margin: 10px auto; }
+    #cameraCanvas { width: 100%; height: 100%; }
+    
+    #handPos { margin-top: 8px; color: #ff0; font-size: 11px; text-align: center; }
+    #status { margin-top: 10px; padding-top: 10px; border-top: 1px solid #0ff; color: #fff; font-size: 11px; }
+    
+    #loadingStatus { color: #ff0; font-size: 11px; margin-bottom: 8px; text-align: center; }
+    .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #0ff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 5px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .toggle-container { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+    .toggle-switch { position: relative; width: 40px; height: 20px; background: #333; border-radius: 10px; transition: background 0.3s; }
+    .toggle-switch.active { background: #0f0; }
+    .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform 0.3s; }
+    .toggle-switch.active::after { transform: translateX(20px); }
+    
+    .color-row { display: flex; gap: 8px; margin-bottom: 6px; }
+    .color-row label { flex: 1; font-size: 10px; }
+    
+    #version { position: absolute; bottom: 10px; right: 10px; color: #0ff; font-size: 11px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 3px; z-index: 100; }
   </style>
 </head>
 <body>
-  <div id="container">
-    <div id="loadingStatus"><span class="spinner"></span>Loading libraries...</div>
-    <button id="startBtn" disabled>START CAMERA</button>
-    <div>Status: <span id="status">Off</span></div>
-    <div id="handInfo">No hand</div>
-    <canvas id="canvas" width="200" height="200"></canvas>
-    <div id="log"></div>
+  <canvas id="mainCanvas"></canvas>
+  
+  <div id="controls">
+    <div id="loadingStatus"><span class="spinner"></span>Loading...</div>
+    
+    <div class="accordion">
+      <div class="accordion-header" data-target="inputPanel">Input Mode</div>
+      <div class="accordion-content" id="inputPanel">
+        <div class="toggle-container" id="cameraToggleContainer">
+          <div class="toggle-switch" id="cameraToggle"></div>
+          <span>Camera Hand Tracking</span>
+        </div>
+        <div id="cameraPreview"><canvas id="cameraCanvas" width="150" height="150"></canvas></div>
+        <div id="handPos">Hand: --</div>
+        <div style="margin-top:8px; color:#888; font-size:10px;">Mouse: always active<br>Camera: overrides when detected</div>
+      </div>
+    </div>
+    
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-target="visualPanel">Visual</div>
+      <div class="accordion-content collapsed" id="visualPanel">
+        <div class="control-group"><label>Density: <span id="densityVal">2.6</span>x</label><input type="range" id="density" min="0.5" max="5" step="0.1" value="2.6"></div>
+        <div class="control-group"><label>Particle Size: <span id="sizeVal">1.4</span></label><input type="range" id="particleSize" min="0.5" max="3" step="0.1" value="1.4"></div>
+        <div class="control-group"><label>Viscosity: <span id="viscosityVal">0.25</span></label><input type="range" id="viscosity" min="0.05" max="0.5" step="0.05" value="0.25"></div>
+        <div class="control-group"><label>Mouse Force: <span id="forceVal">4.0</span></label><input type="range" id="mouseForce" min="1" max="10" step="0.5" value="4.0"></div>
+      </div>
+    </div>
+    
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-target="colorPanel">Colors</div>
+      <div class="accordion-content collapsed" id="colorPanel">
+        <div class="color-row">
+          <label>Color 1:<input type="color" id="color1" value="#00ffff"></label>
+          <label>Color 2:<input type="color" id="color2" value="#ff00ff"></label>
+        </div>
+        <div class="color-row">
+          <label>Color 3:<input type="color" id="color3" value="#ffff00"></label>
+          <label>Color 4:<input type="color" id="color4" value="#00ff00"></label>
+        </div>
+      </div>
+    </div>
+    
+    <div id="status">FPS: <span id="fps">--</span> | Particles: <span id="pcount">--</span></div>
   </div>
-  <div id="version">v0.63 - Smooth Tracking</div>
+  
+  <div id="version">v1.0 - Fluid + Hand Tracking</div>
 
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
   
   <script>
-    (function() {
-      // 隐藏的视频元素
-      const video = document.createElement('video');
-      video.setAttribute('playsinline', '');
-      video.setAttribute('muted', '');
-      video.style.display = 'none';
-      document.body.appendChild(video);
+    // ============================================
+    // FLUID SIMULATION (SPH-based)
+    // ============================================
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let particles = [];
+    const BASE_PARTICLES = 300;
+    let mouseX = 0, mouseY = 0;
+    let isMouseDown = false;
+    
+    // Parameters
+    let params = {
+      density: 2.6,
+      particleSize: 1.4,
+      viscosity: 0.25,
+      mouseForce: 4.0,
+      colors: ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']
+    };
+    
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    class Particle {
+      constructor() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.vx = 0;
+        this.vy = 0;
+        this.radius = 8;
+        this.color = Math.floor(Math.random() * params.colors.length);
+      }
       
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      const startBtn = document.getElementById('startBtn');
-      const statusEl = document.getElementById('status');
-      const handInfo = document.getElementById('handInfo');
-      const logEl = document.getElementById('log');
-      const loadingStatus = document.getElementById('loadingStatus');
-
-      let model = null;
-      let isRunning = false;
-      let rafId = null;
-
-      function log(msg) {
-        const div = document.createElement('div');
-        const time = new Date().toLocaleTimeString('zh-CN', {hour12: false});
-        div.textContent = `[${time}] ${msg}`;
-        logEl.appendChild(div);
-        logEl.scrollTop = logEl.scrollHeight;
-        console.log(msg);
-      }
-
-      // Check if libraries loaded
-      function checkLibraries() {
-        if (typeof tf === 'undefined') {
-          log('ERROR: TensorFlow.js not loaded');
-          return false;
-        }
-        if (typeof handpose === 'undefined') {
-          log('ERROR: Handpose not loaded');
-          return false;
-        }
-        log('Libraries loaded: tf=' + tf.version.tfjs + ', handpose=' + (handpose.version || 'unknown'));
-        return true;
-      }
-
-      // Setup camera (1:1 square)
-      async function setupCamera() {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 480, height: 480 },
-          audio: false
-        });
-        video.srcObject = stream;
-        return new Promise((resolve) => {
-          video.onloadedmetadata = () => resolve(video);
-        });
-      }
-
-      // Smoothing variables
-      let lastX = 0.5, lastY = 0.5;  // 上一次有效坐标（归一化 0-1）
-      let missCount = 0;              // 连续未检测到的帧数
-      let hasHand = false;            // 当前是否有手
-      const SMOOTH_FACTOR = 0.3;      // 平滑系数（0-1，越大越跟手但越抖）
-      const MISS_THRESHOLD = 5;       // 连续丢帧5次才认为真的没手
-      
-      // Detect and draw
-      async function detect() {
-        if (!isRunning || !model) return;
-
-        // Draw video (镜像)
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-canvas.width, 0);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-
-        // Detect hands
-        const predictions = await model.estimateHands(video);
-        let detected = false;
-        let targetX = lastX, targetY = lastY;
-
-        if (predictions.length > 0) {
-          const hand = predictions[0];
-          const landmarks = hand.landmarks;
-          const palmBase = landmarks[0];
-          
-          // 获取目标坐标（归一化）
-          targetX = palmBase[0] / video.videoWidth;
-          targetY = palmBase[1] / video.videoHeight;
-          detected = true;
-          missCount = 0;
-          
-          // Draw landmarks (镜像坐标)
-          ctx.fillStyle = '#00ff00';
-          for (let i = 0; i < landmarks.length; i++) {
-            const x = landmarks[i][0] * (canvas.width / video.videoWidth);
-            const y = landmarks[i][1] * (canvas.height / video.videoHeight);
-            ctx.beginPath();
-            ctx.arc(canvas.width - x, y, 3, 0, 2 * Math.PI);
-            ctx.fill();
-          }
+      update() {
+        // Hand/Mouse interaction
+        let targetX, targetY, isActive;
+        
+        if (handTracking.isDetected) {
+          // Use hand position
+          targetX = handTracking.x * width;
+          targetY = handTracking.y * height;
+          isActive = true;
+        } else if (isMouseDown) {
+          // Use mouse position
+          targetX = mouseX;
+          targetY = mouseY;
+          isActive = true;
         } else {
-          missCount++;
-        }
-
-        // 判断是否真的有手（防抖）
-        if (detected) {
-          hasHand = true;
-        } else if (missCount > MISS_THRESHOLD) {
-          hasHand = false;
-        }
-
-        // 平滑处理：如果检测到手或刚丢不久，做插值
-        if (hasHand) {
-          // 指数平滑：新值 = 旧值 * (1-α) + 目标值 * α
-          lastX = lastX * (1 - SMOOTH_FACTOR) + targetX * SMOOTH_FACTOR;
-          lastY = lastY * (1 - SMOOTH_FACTOR) + targetY * SMOOTH_FACTOR;
-          
-          const x = Math.round(lastX * 100);
-          const y = Math.round(lastY * 100);
-          handInfo.textContent = `Hand: ${x}%, ${y}%`;
-
-          const r = Math.round(lastX * 255);
-          const g = Math.round((1 - lastY) * 128);
-          const b = Math.round((1 - lastX) * 255);
-          document.body.style.background = `rgb(${r},${g},${b})`;
-        } else {
-          // 真的没手了，渐变回黑色
-          lastX = lastX * 0.9 + 0.5 * 0.1;  // 慢慢回到中心
-          lastY = lastY * 0.9 + 0.5 * 0.1;
-          handInfo.textContent = 'No hand';
-          document.body.style.background = '#000';
-        }
-
-        rafId = requestAnimationFrame(detect);
-      }
-
-      // Start/Stop
-      startBtn.addEventListener('click', async () => {
-        if (!model) {
-          log('Please wait for model to load');
-          return;
+          isActive = false;
         }
         
-        if (!isRunning) {
-          log('Starting...');
-          
-          try {
-            // Setup camera
-            await setupCamera();
-            video.play();
-            canvas.style.display = 'block';
-            log(`Camera: ${video.videoWidth}x${video.videoHeight}`);
-            
-            isRunning = true;
-            statusEl.textContent = 'Running';
-            statusEl.style.color = '#0f0';
-            startBtn.textContent = 'STOP';
-            
-            // Start detection
-            detect();
-            log('Started! Show your hand');
-            
-          } catch (err) {
-            log('ERROR: ' + err.message);
-            console.error(err);
-            statusEl.textContent = 'Error';
-            statusEl.style.color = '#f00';
+        if (isActive) {
+          const dx = targetX - this.x;
+          const dy = targetY - this.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 150 && dist > 1) {
+            const force = (150 - dist) / 150 * params.mouseForce;
+            this.vx += (dx / dist) * force;
+            this.vy += (dy / dist) * force;
           }
-        } else {
-          log('Stopping...');
-          isRunning = false;
-          if (rafId) cancelAnimationFrame(rafId);
-          if (video.srcObject) {
-            video.srcObject.getTracks().forEach(t => t.stop());
-            video.srcObject = null;
-          }
-          canvas.style.display = 'none';
-          statusEl.textContent = 'Off';
-          statusEl.style.color = '#fff';
-          startBtn.textContent = 'START CAMERA';
-          handInfo.textContent = 'No hand';
-          document.body.style.background = '#000';
-          log('Stopped');
         }
+        
+        // Particle-particle interaction (simplified SPH)
+        for (let j = 0; j < particles.length; j++) {
+          if (i === j) continue;
+          const pj = particles[j];
+          const dx = this.x - pj.x;
+          const dy = this.y - pj.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 20 && dist > 0.1) {
+            const force = (20 - dist) / 20 * 0.5;
+            this.vx += (dx / dist) * force * 0.1;
+            this.vy += (dy / dist) * force * 0.1;
+          }
+        }
+        
+        // Viscosity
+        this.vx *= (1 - params.viscosity * 0.1);
+        this.vy *= (1 - params.viscosity * 0.1);
+        
+        // Update position
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        // Boundary
+        if (this.x < 0 || this.x > width) { this.vx *= -0.8; this.x = Math.max(0, Math.min(width, this.x)); }
+        if (this.y < 0 || this.y > height) { this.vy *= -0.8; this.y = Math.max(0, Math.min(height, this.y)); }
+      }
+      
+      draw() {
+        const size = this.radius * params.particleSize;
+        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size);
+        gradient.addColorStop(0, params.colors[this.color]);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    // Initialize particles
+    function initParticles() {
+      particles = [];
+      const count = Math.floor(BASE_PARTICLES * params.density);
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle());
+      }
+    }
+    initParticles();
+    
+    // ============================================
+    // HAND TRACKING (TensorFlow.js Handpose)
+    // ============================================
+    const video = document.createElement('video');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('muted', '');
+    video.style.display = 'none';
+    document.body.appendChild(video);
+    
+    const cameraCanvas = document.getElementById('cameraCanvas');
+    const cameraCtx = cameraCanvas.getContext('2d');
+    const cameraToggle = document.getElementById('cameraToggle');
+    const cameraToggleContainer = document.getElementById('cameraToggleContainer');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const handPos = document.getElementById('handPos');
+    const loadingStatus = document.getElementById('loadingStatus');
+    const statusEl = document.getElementById('status');
+    
+    let handModel = null;
+    let isCameraRunning = false;
+    let rafId = null;
+    
+    // Hand tracking state (from v0.63)
+    let handTracking = {
+      x: 0.5,
+      y: 0.5,
+      isDetected: false,
+      lastX: 0.5,
+      lastY: 0.5,
+      missCount: 0
+    };
+    
+    const SMOOTH_FACTOR = 0.3;
+    const MISS_THRESHOLD = 5;
+    
+    async function initHandTracking() {
+      loadingStatus.innerHTML = '<span class="spinner"></span>Loading model...';
+      
+      try {
+        await new Promise(r => setTimeout(r, 500)); // Wait for CDN
+        
+        if (typeof tf === 'undefined' || typeof handpose === 'undefined') {
+          throw new Error('Libraries not loaded');
+        }
+        
+        handModel = await handpose.load();
+        loadingStatus.innerHTML = '✓ Model ready';
+        loadingStatus.style.color = '#0f0';
+        cameraToggleContainer.style.opacity = '1';
+        
+      } catch (err) {
+        loadingStatus.innerHTML = '✗ Failed: ' + err.message;
+        loadingStatus.style.color = '#f00';
+      }
+    }
+    
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 480 },
+        audio: false
       });
-
-      // Wait for page to fully load, then load model
-      async function init() {
-        // Wait a bit for CDN scripts to execute
-        await new Promise(r => setTimeout(r, 500));
+      video.srcObject = stream;
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+    
+    async function detectHands() {
+      if (!isCameraRunning || !handModel) return;
+      
+      // Draw mirrored video
+      cameraCtx.save();
+      cameraCtx.scale(-1, 1);
+      cameraCtx.translate(-cameraCanvas.width, 0);
+      cameraCtx.drawImage(video, 0, 0, cameraCanvas.width, cameraCanvas.height);
+      cameraCtx.restore();
+      
+      const predictions = await handModel.estimateHands(video);
+      let targetX = handTracking.lastX;
+      let targetY = handTracking.lastY;
+      let detected = false;
+      
+      if (predictions.length > 0) {
+        const landmarks = predictions[0].landmarks;
+        const palmBase = landmarks[0];
         
-        if (!checkLibraries()) {
-          loadingStatus.innerHTML = '✗ Libraries failed to load';
-          loadingStatus.style.color = '#f00';
-          return;
+        // Mirror X coordinate
+        targetX = 1 - (palmBase[0] / video.videoWidth);
+        targetY = palmBase[1] / video.videoHeight;
+        detected = true;
+        handTracking.missCount = 0;
+        
+        // Draw landmarks
+        cameraCtx.fillStyle = '#00ff00';
+        for (let i = 0; i < landmarks.length; i++) {
+          const x = landmarks[i][0] * (cameraCanvas.width / video.videoWidth);
+          const y = landmarks[i][1] * (cameraCanvas.height / video.videoHeight);
+          cameraCtx.beginPath();
+          cameraCtx.arc(cameraCanvas.width - x, y, 2, 0, 2 * Math.PI);
+          cameraCtx.fill();
         }
-        
-        loadingStatus.innerHTML = '<span class="spinner"></span>Loading model...';
-        
-        try {
-          log('Loading model...');
-          const startTime = Date.now();
-          model = await handpose.load();
-          const loadTime = Date.now() - startTime;
-          log(`Model loaded in ${loadTime}ms`);
-          
-          startBtn.disabled = false;
-          loadingStatus.innerHTML = '✓ Model ready';
-          loadingStatus.style.color = '#0f0';
-          
-        } catch (err) {
-          log('ERROR loading model: ' + err.message);
-          loadingStatus.innerHTML = '✗ Failed: ' + err.message;
-          loadingStatus.style.color = '#f00';
-        }
+      } else {
+        handTracking.missCount++;
       }
       
-      init();
-    })();
+      // Debounce
+      if (detected) {
+        handTracking.isDetected = true;
+      } else if (handTracking.missCount > MISS_THRESHOLD) {
+        handTracking.isDetected = false;
+      }
+      
+      // Smoothing
+      if (handTracking.isDetected) {
+        handTracking.lastX = handTracking.lastX * (1 - SMOOTH_FACTOR) + targetX * SMOOTH_FACTOR;
+        handTracking.lastY = handTracking.lastY * (1 - SMOOTH_FACTOR) + targetY * SMOOTH_FACTOR;
+        handTracking.x = handTracking.lastX;
+        handTracking.y = handTracking.lastY;
+        
+        handPos.textContent = `Hand: ${Math.round(handTracking.x * 100)}%, ${Math.round(handTracking.y * 100)}%`;
+        handPos.style.color = '#0f0';
+      } else {
+        handPos.textContent = 'Hand: --';
+        handPos.style.color = '#ff0';
+      }
+      
+      rafId = requestAnimationFrame(detectHands);
+    }
+    
+    async function startCamera() {
+      try {
+        await setupCamera();
+        video.play();
+        cameraPreview.style.display = 'block';
+        isCameraRunning = true;
+        cameraToggle.classList.add('active');
+        detectHands();
+      } catch (err) {
+        alert('Camera error: ' + err.message);
+        cameraToggle.classList.remove('active');
+      }
+    }
+    
+    function stopCamera() {
+      isCameraRunning = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      cameraPreview.style.display = 'none';
+      cameraToggle.classList.remove('active');
+      handTracking.isDetected = false;
+      handPos.textContent = 'Hand: --';
+    }
+    
+    cameraToggleContainer.addEventListener('click', () => {
+      if (!handModel) return;
+      if (isCameraRunning) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+    
+    // ============================================
+    // UI CONTROLS
+    // ============================================
+    document.querySelectorAll('.accordion-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const target = document.getElementById(header.dataset.target);
+        header.classList.toggle('collapsed');
+        target.classList.toggle('collapsed');
+      });
+    });
+    
+    document.getElementById('density').addEventListener('input', (e) => {
+      params.density = parseFloat(e.target.value);
+      document.getElementById('densityVal').textContent = params.density.toFixed(1);
+      initParticles();
+    });
+    
+    document.getElementById('particleSize').addEventListener('input', (e) => {
+      params.particleSize = parseFloat(e.target.value);
+      document.getElementById('sizeVal').textContent = params.particleSize.toFixed(1);
+    });
+    
+    document.getElementById('viscosity').addEventListener('input', (e) => {
+      params.viscosity = parseFloat(e.target.value);
+      document.getElementById('viscosityVal').textContent = params.viscosity.toFixed(2);
+    });
+    
+    document.getElementById('mouseForce').addEventListener('input', (e) => {
+      params.mouseForce = parseFloat(e.target.value);
+      document.getElementById('forceVal').textContent = params.mouseForce.toFixed(1);
+    });
+    
+    ['color1', 'color2', 'color3', 'color4'].forEach((id, i) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        params.colors[i] = e.target.value;
+      });
+    });
+    
+    // Mouse events
+    canvas.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+    canvas.addEventListener('mousedown', () => isMouseDown = true);
+    canvas.addEventListener('mouseup', () => isMouseDown = false);
+    canvas.addEventListener('touchstart', (e) => {
+      isMouseDown = true;
+      mouseX = e.touches[0].clientX;
+      mouseY = e.touches[0].clientY;
+    });
+    canvas.addEventListener('touchend', () => isMouseDown = false);
+    canvas.addEventListener('touchmove', (e) => {
+      mouseX = e.touches[0].clientX;
+      mouseY = e.touches[0].clientY;
+    });
+    
+    // ============================================
+    // MAIN LOOP
+    // ============================================
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fpsTime = 0;
+    
+    function animate() {
+      const now = performance.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      
+      // Clear
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.fillRect(0, 0, width, height);
+      
+      // Update and draw particles
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update(i);
+        particles[i].draw();
+      }
+      
+      // FPS counter
+      frameCount++;
+      fpsTime += dt;
+      if (fpsTime >= 1) {
+        document.getElementById('fps').textContent = frameCount;
+        document.getElementById('pcount').textContent = particles.length;
+        frameCount = 0;
+        fpsTime = 0;
+      }
+      
+      requestAnimationFrame(animate);
+    }
+    
+    // Start
+    initHandTracking();
+    animate();
   </script>
 </body>
 </html>
-          handInfo.textContent = 'No hand';
-          document.body.style.background = '#000';
-          log('Stopped');
-        }
-      });
-
-      // Wait for page to fully load, then load model
-      async function init() {
-        // Wait a bit for CDN scripts to execute
-        await new Promise(r =>

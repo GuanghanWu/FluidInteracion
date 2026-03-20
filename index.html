@@ -145,6 +145,123 @@
       colors: ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']
     };
     
+    // ============================================
+    // DYNAMIC SPATIAL GRID (for particle interaction)
+    // ============================================
+    class SpatialGrid {
+      constructor() {
+        this.cellSize = PARTICLE_REPULSION_RADIUS * 2; // Default 40px
+        this.cols = 0;
+        this.rows = 0;
+        this.cells = [];
+        this.particleCount = 0; // Track for stats
+      }
+      
+      // Calculate optimal cell size based on particle distribution
+      calculateOptimalCellSize() {
+        if (particles.length === 0) return PARTICLE_REPULSION_RADIUS * 2;
+        
+        // Find bounding box of particles
+        let minX = width, maxX = 0;
+        let minY = height, maxY = 0;
+        
+        for (const p of particles) {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y);
+          maxY = Math.max(maxY, p.y);
+        }
+        
+        // Calculate coverage area
+        const coverageWidth = maxX - minX;
+        const coverageHeight = maxY - minY;
+        const coverageArea = coverageWidth * coverageHeight;
+        const screenArea = width * height;
+        const coverage = coverageArea / screenArea;
+        
+        // If particles are clustered (< 40% coverage), use smaller cells
+        // If spread out, use larger cells
+        if (coverage < 0.2) {
+          // Highly clustered - use smaller cells for better precision
+          return Math.max(20, PARTICLE_REPULSION_RADIUS * 1.5);
+        } else if (coverage > 0.7) {
+          // Spread out - use larger cells
+          return PARTICLE_REPULSION_RADIUS * 3;
+        }
+        // Normal distribution
+        return PARTICLE_REPULSION_RADIUS * 2;
+      }
+      
+      rebuild() {
+        // Recalculate optimal cell size every 10 frames
+        if (!this.lastRebuild || performance.now() - this.lastRebuild > 160) {
+          this.cellSize = this.calculateOptimalCellSize();
+          this.lastRebuild = performance.now();
+        }
+        
+        this.cols = Math.ceil(width / this.cellSize);
+        this.rows = Math.ceil(height / this.cellSize);
+        
+        // Clear and resize cells array
+        const cellCount = this.cols * this.rows;
+        if (this.cells.length !== cellCount) {
+          this.cells = new Array(cellCount);
+          for (let i = 0; i < cellCount; i++) {
+            this.cells[i] = [];
+          }
+        } else {
+          // Clear existing cells
+          for (let i = 0; i < cellCount; i++) {
+            this.cells[i].length = 0;
+          }
+        }
+        
+        // Insert particles into grid
+        this.particleCount = 0;
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const col = Math.floor(p.x / this.cellSize);
+          const row = Math.floor(p.y / this.cellSize);
+          
+          // Clamp to valid range
+          if (col >= 0 && col < this.cols && row >= 0 && row < this.rows) {
+            const cellIndex = row * this.cols + col;
+            this.cells[cellIndex].push(i);
+            this.particleCount++;
+          }
+        }
+      }
+      
+      // Query neighboring cells for a particle
+      queryNeighbors(particleIndex, callback) {
+        const p = particles[particleIndex];
+        const col = Math.floor(p.x / this.cellSize);
+        const row = Math.floor(p.y / this.cellSize);
+        
+        // Check 3x3 neighborhood
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nc = col + dx;
+            const nr = row + dy;
+            
+            if (nc >= 0 && nc < this.cols && nr >= 0 && nr < this.rows) {
+              const cellIndex = nr * this.cols + nc;
+              const cell = this.cells[cellIndex];
+              
+              for (const otherIndex of cell) {
+                if (otherIndex !== particleIndex) {
+                  callback(otherIndex);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Create global grid instance
+    const spatialGrid = new SpatialGrid();
+    
     // Debounced resize handler
     let resizeTimeout;
     function resize() {
@@ -167,7 +284,7 @@
         this.color = Math.floor(Math.random() * params.colors.length);
       }
       
-      update() {
+      update(particleIndex) {
         // Hand/Mouse interaction
         let targetX, targetY, isActive;
         
@@ -196,10 +313,9 @@
           }
         }
         
-        // Particle-particle interaction (simplified SPH)
-        for (let j = 0; j < particles.length; j++) {
-          if (this === particles[j]) continue;
-          const pj = particles[j];
+        // Particle-particle interaction using spatial grid (only check neighbors)
+        spatialGrid.queryNeighbors(particleIndex, (otherIndex) => {
+          const pj = particles[otherIndex];
           const dx = this.x - pj.x;
           const dy = this.y - pj.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -208,7 +324,7 @@
             this.vx += (dx / dist) * force * 0.1;
             this.vy += (dy / dist) * force * 0.1;
           }
-        }
+        });
         
         // Viscosity
         this.vx *= (1 - params.viscosity * VISCOSITY_SCALE);
@@ -578,9 +694,12 @@
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
       ctx.fillRect(0, 0, width, height);
       
-      // Update and draw particles
+      // Rebuild spatial grid for this frame
+      spatialGrid.rebuild();
+      
+      // Update and draw particles (using grid for neighbor queries)
       for (let i = 0; i < particles.length; i++) {
-        particles[i].update();
+        particles[i].update(i);
         particles[i].draw();
       }
       
@@ -591,6 +710,11 @@
         document.getElementById('pcount').textContent = particles.length;
         frameCount = 0;
         lastFpsUpdate = now;
+      }
+      
+      // Debug: log grid stats every 5 seconds
+      if (performance.now() % 5000 < 20) {
+        console.log(`Grid: ${spatialGrid.cols}x${spatialGrid.rows}, cellSize: ${spatialGrid.cellSize.toFixed(1)}px`);
       }
       
       requestAnimationFrame(animate);

@@ -715,34 +715,40 @@ let gestureFrameSkip = 0;
 const GESTURE_SKIP_INTERVAL = 2; // 30fps
 
 async function initHandTracking() {
-  const loadingStatus = document.getElementById('loadingStatus');
-  if (loadingStatus) {
-    loadingStatus.innerHTML = '<span class="spinner"></span>Loading model...';
-  }
+  const cameraLoading = document.getElementById('cameraLoading');
+  const cameraError = document.getElementById('cameraError');
+  
+  if (cameraLoading) cameraLoading.style.display = 'block';
+  if (cameraError) cameraError.style.display = 'none';
   
   try {
+    // 等待 CDN 加载
     await new Promise(r => setTimeout(r, 500));
     
     if (typeof tf === 'undefined') {
-      throw new Error('TensorFlow.js not loaded');
+      throw new Error('TensorFlow.js not loaded from CDN');
     }
     if (typeof handpose === 'undefined') {
-      throw new Error('Handpose model not loaded');
+      throw new Error('Handpose model not loaded from CDN');
     }
     
-    handModel = await handpose.load();
+    // 加载模型（带 30 秒超时）
+    const loadPromise = handpose.load();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Model loading timeout (30s)')), 30000)
+    );
     
-    if (loadingStatus) {
-      loadingStatus.innerHTML = '✓ Model ready';
-      loadingStatus.style.color = '#0f0';
-    }
+    handModel = await Promise.race([loadPromise, timeoutPromise]);
+    
+    if (cameraLoading) cameraLoading.style.display = 'none';
     
     return true;
   } catch (err) {
     console.error('Hand tracking init failed:', err);
-    if (loadingStatus) {
-      loadingStatus.innerHTML = '✗ Failed: ' + err.message;
-      loadingStatus.style.color = '#f00';
+    if (cameraLoading) cameraLoading.style.display = 'none';
+    if (cameraError) {
+      cameraError.textContent = 'Error: ' + err.message;
+      cameraError.style.display = 'block';
     }
     return false;
   }

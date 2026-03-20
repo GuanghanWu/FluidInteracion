@@ -728,28 +728,11 @@ async function initHandTracking() {
   if (cameraError) cameraError.style.display = 'none';
   
   try {
-    // 等待 CDN 加载
-    await new Promise(r => setTimeout(r, 500));
-    
-    if (typeof tf === 'undefined') {
-      throw new Error('TensorFlow.js not loaded from CDN');
-    }
-    if (typeof handpose === 'undefined') {
-      throw new Error('Handpose model not loaded from CDN');
-    }
-    
-    // 配置 TensorFlow.js 使用 IndexedDB 缓存
-    await tf.setBackend('webgl');
-    await tf.ready();
-    
-    // 加载模型（带 60 秒超时，模型文件约 20MB）
-    const loadPromise = handpose.load();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('模型加载超时 (60s)。请检查网络连接，或尝试使用代理访问。')), 60000)
-    );
-    
-    handModel = await Promise.race([loadPromise, timeoutPromise]);
-    console.log('Handpose model loaded and cached');
+    // 直接加载模型（v0.63 方式，不添加额外延迟）
+    const startTime = Date.now();
+    handModel = await handpose.load();
+    const loadTime = Date.now() - startTime;
+    console.log(`Model loaded in ${loadTime}ms`);
     
     if (cameraLoading) cameraLoading.style.display = 'none';
     

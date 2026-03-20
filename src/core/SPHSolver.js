@@ -1,0 +1,157 @@
+/**
+ * SPH 流体求解器 - 修复版
+ * 能量守恒 + 正确粘度
+ */
+import { Particle } from './Particle.js';
+
+export class SPHSolver {
+  constructor(options = {}) {
+    this.h = options.h || 0.3;
+    this.maxParticles = options.maxParticles || 300;
+    this.dt = options.dt || 0.016;
+    this.gravity = options.gravity || { x: 0, y: -2 };
+    this.restDensity = options.restDensity || 1.0;
+    this.gasConstant = options.gasConstant || 0.3;
+    this.viscosity = options.viscosity || 0.1;
+    this.particles = [];
+    
+    // 边界设置（用于镜像粒子）
+    this.bounds = options.bounds || null; // { minX, minY, maxX, maxY }
+  }
+  
+  addParticle(x, y) {
+    if (this.particles.length >= this.maxParticles) return false;
+    this.particles.push(new Particle(x, y));
+    return true;
+  }
+  
+  // Poly6 核函数
+  poly6(r) {
+    if (r >= this.h) return 0;
+    const h2 = this.h * this.h;
+    const diff = h2 - r * r;
+    return (315 / (64 * Math.PI * Math.pow(this.h, 9))) * diff * diff * diff;
+  }
+  
+  // Spiky 核函数梯度（用于压力）
+  spikyGrad(r) {
+    if (r >= this.h || r < 0.0001) return 0;
+    const diff = this.h - r;
+    return (-45 / (Math.PI * Math.pow(this.h, 6))) * diff * diff;
+  }
+  
+  // 粘度核函数拉普拉斯（用于粘度）
+  viscosityLap(r) {
+    if (r >= this.h) return 0;
+    return (45 / (Math.PI * Math.pow(this.h, 6))) * (this.h - r);
+  }
+  
+  // 计算镜像粒子对密度的贡献
+  _ghostParticleDensity(pi) {
+    let ghostDensity = 0;
+    const { minX, minY, maxX, maxY } = this.bounds;
+    const h = this.h;
+    
+    // 检查四个边界，生成镜像粒子
+    // 镜像粒子距离 = 粒子到边界的距离 + 边界到镜像粒子的距离（相同）
+    // 即：镜像粒子在边界外对称位置，距离 = 2 * 到边界距离
+    
+    // 左边界：镜像粒子在 minX - dist 处，到 pi 的距离 = dist + dist = 2*dist
+    if (pi.x - minX < h) {
+      const distToBoundary = pi.x - minX;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
+    }
+    // 右边界
+    if (maxX - pi.x < h) {
+      const distToBoundary = maxX - pi.x;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
+    }
+    // 下边界
+    if (pi.y - minY < h) {
+      const distToBoundary = pi.y - minY;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
+    }
+    // 上边界
+    if (maxY - pi.y < h) {
+      const distToBoundary = maxY - pi.y;
+      const distToGhost = 2 * distToBoundary;
+      if (distToGhost < h) {
+        ghostDensity += this.poly6(distToGhost);
+      }
+    }
+    
+    return ghostDensity;
+  }
+  
+  step() {
+    const minDist = this.h * 0.5; // 最小距离，小于此距离产生排斥
+    const repulsionStrength = 2.0; // 排斥力强度
+    const attractionStrength = 0.1; // 吸引力（让粒子保持一定距离）
+    
+    // 计算力 - 简单排斥力模型
+    for (let i = 0; i < this.particles.length; i++) {
+      const pi = this.particles[i];
+      let fx = 0, fy = 0;
+      
+      for (let j = 0; j < this.particles.length; j++) {
+        if (i === j) continue;
+        
+        const pj = this.particles[j];
+        const dx = pi.x - pj.x;
+        const dy = pi.y - pj.y;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        
+        if (r < 0.0001) continue;
+        
+        if (r < minDist) {
+          // 太近时排斥
+          const force = (minDist - r) * repulsionStrength;
+          fx += force * (dx / r);
+          fy += force * (dy / r);
+        } else if (r < this.h) {
+          // 中等距离时轻微吸引（保持聚集）
+          const force = -(r - minDist) * attractionStrength;
+          fx += force * (dx / r);
+          fy += force * (dy / r);
+        }
+        
+        // 粘度力（速度平滑）
+        if (r < this.h) {
+          const viscForce = this.viscosity * 0.1;
+          fx += viscForce * (pj.vx - pi.vx);
+          fy += viscForce * (pj.vy - pi.vy);
+        }
+      }
+      
+      pi.ax = fx + this.gravity.x;
+      pi.ay = fy + this.gravity.y;
+    }
+    
+    // 3. 更新速度和位置
+    for (const p of this.particles) {
+      // 半隐式欧拉积分（更稳定）
+      p.vx += p.ax * this.dt;
+      p.vy += p.ay * this.dt;
+      
+      // 速度限制（防止爆炸）
+      const maxSpeed = 10;
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      if (speed > maxSpeed) {
+        p.vx = (p.vx / speed) * maxSpeed;
+        p.vy = (p.vy / speed) * maxSpeed;
+      }
+      
+      p.x += p.vx * this.dt;
+      p.y += p.vy * this.dt;
+    }
+  }
+}

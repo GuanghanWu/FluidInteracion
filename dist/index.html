@@ -3,89 +3,426 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Hand Tracker</title>
+  <title>Fluid Simulation v1.3 - Metaball + Hand Tracking</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      overflow: hidden;
-      background: #000;
-      transition: background 0.1s ease;
-    }
-    #controls {
+    body { overflow: hidden; background: #000; }
+    canvas { display: block; }
+    #info {
       position: absolute;
       top: 10px;
       left: 10px;
       color: #0ff;
       font-family: monospace;
-      font-size: 14px;
-      background: rgba(0,10,20,0.9);
+      font-size: 12px;
+      background: rgba(0,10,20,0.85);
       padding: 15px;
       border-radius: 8px;
       border: 1px solid #0ff;
-      z-index: 100;
+      min-width: 220px;
+      max-height: 90vh;
+      overflow-y: auto;
     }
-    #controls label {
-      display: block;
+    .control-group {
       margin-bottom: 10px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 3px;
+      color: #fff;
+    }
+    .control-group input[type="range"] {
+      width: 100%;
       cursor: pointer;
     }
-    #controls input[type="checkbox"] {
-      margin-right: 8px;
+    .control-group input[type="color"] {
+      width: 100%;
+      height: 30px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
     }
-    #info {
+    .stats {
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px solid #0ff;
-      color: #fff;
-      font-size: 12px;
-    }
-    #cameraPreview {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      width: 160px;
-      height: 120px;
-      border: 2px solid #0ff;
-      border-radius: 8px;
-      overflow: hidden;
-      display: none;
-      z-index: 100;
-    }
-    #cameraPreview video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
+      color: #0ff;
     }
     #version {
       position: absolute;
       bottom: 10px;
-      left: 10px;
+      right: 10px;
       color: #0ff;
       font-family: monospace;
       font-size: 12px;
-      z-index: 100;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
+      border-radius: 3px;
+    }
+    /* 折叠页样式 */
+    .accordion {
+      margin-bottom: 10px;
+    }
+    .accordion-header {
+      background: rgba(0, 80, 100, 0.5);
+      padding: 8px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-header:hover {
+      background: rgba(0, 100, 120, 0.6);
+    }
+    .accordion-header::after {
+      content: '▼';
+      font-size: 10px;
+    }
+    .accordion-header.collapsed::after {
+      content: '▶';
+    }
+    .accordion-content {
+      padding: 10px;
+      display: block;
+    }
+    .accordion-content.collapsed {
+      display: none;
+    }
+    .color-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .color-row label {
+      flex: 1;
+      font-size: 11px;
+    }
+    /* HSV 颜色选择器 - 点击展开 */
+    .color-item {
+      margin-bottom: 8px;
+    }
+    .color-item label {
+      font-size: 11px;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .color-bar {
+      width: 100%;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 255, 255, 0.5);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .color-bar:hover {
+      transform: scale(1.02);
+      border-color: #0ff;
+    }
+    .color-bar.active {
+      border-color: #0ff;
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+    .hsv-popup {
+      display: none;
+      padding: 8px;
+      background: rgba(0, 40, 50, 0.9);
+      border-radius: 4px;
+      margin-top: 4px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+    }
+    .hsv-popup.show {
+      display: block;
+    }
+    .hsv-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .hsv-row:last-child {
+      margin-bottom: 0;
+    }
+    .hsv-row span {
+      width: 16px;
+      font-size: 10px;
+      color: #0ff;
+      text-align: center;
+    }
+    .hsv-row input[type="range"] {
+      flex: 1;
+      height: 14px;
+    }
+    /* 二级折叠页 - 更简洁 */
+    .sub-accordion {
+      margin: 6px 0;
+      border-left: 2px solid rgba(0, 255, 255, 0.3);
+      padding-left: 8px;
+    }
+    .sub-header {
+      font-size: 11px;
+      color: #0ff;
+      cursor: pointer;
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.8;
+    }
+    .sub-header:hover {
+      opacity: 1;
+    }
+    .sub-header::after {
+      content: '▼';
+      font-size: 8px;
+    }
+    .sub-header.collapsed::after {
+      content: '▶';
+    }
+    .sub-content {
+      display: block;
+      padding: 4px 0 4px 8px;
+    }
+    .sub-content.collapsed {
+      display: none;
+    }
+    .sub-control {
+      margin-bottom: 6px;
+    }
+    .sub-control label {
+      font-size: 10px;
+      color: #aaa;
+      margin-bottom: 2px;
+      display: block;
+    }
+    .sub-control input[type="range"] {
+      width: 100%;
+      height: 12px;
+    }
+    .sub-control select {
+      width: 100%;
+      padding: 3px 6px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #0ff;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      border-radius: 3px;
+      font-size: 10px;
+    }
+    /* 颜色网格 */
+    .color-grid {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+    }
+    .color-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-dot:hover {
+      transform: scale(1.1);
+      border-color: #0ff;
+    }
+    .color-dot.active {
+      border-color: #0ff;
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+    .color-dot.hidden {
+      display: none;
+    }
+    .hsv-inline {
+      display: none;
+      padding: 8px;
+      background: rgba(0, 30, 40, 0.8);
+      border-radius: 4px;
+      margin-top: 8px;
+      border: 1px solid rgba(0, 255, 255, 0.3);
+    }
+    .hsv-inline.show {
+      display: block;
+    }
+    /* 面板折叠 */
+    #panelContent.collapsed {
+      display: none;
+    }
+    #info.collapsed {
+      min-width: auto;
+      padding: 10px 15px;
+    }
+    #panelToggle {
+      transition: transform 0.2s;
+    }
+    #panelToggle.collapsed {
+      transform: rotate(-90deg);
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-D6ZwRbtL.js"></script>
+  <script type="module" crossorigin src="/assets/index-BWo4SfI3.js"></script>
 </head>
 <body>
-  <div id="controls">
-    <label>
-      <input type="checkbox" id="cameraToggle"> Camera
-    </label>
-    <div id="info">
-      <div>Status: <span id="status">Off</span></div>
-      <div>Hand: <span id="handPos">--</span></div>
-      <div>BG: <span id="bgColor">#000000</span></div>
+  <div id="info">
+    <!-- 面板折叠按钮 -->
+    <div id="panelToggle" style="position: absolute; top: 5px; right: 10px; cursor: pointer; font-size: 14px; color: #0ff;">▼</div>
+    
+    <!-- 面板内容 -->
+    <div id="panelContent">
+      <div id="loadingStatus" style="color: #0f0; font-size: 11px; margin-bottom: 8px; text-align: center;">Ready</div>
+    <!-- 基础参数 -->
+    <div class="control-group">
+      <label>Density: <span id="densityVal">2.6x</span></label>
+      <input type="range" id="density" min="0.5" max="5.0" value="2.6" step="0.1" title="Max 5x ≈ 1500 particles">
+    </div>
+    <div class="control-group">
+      <label>Particle Size: <span id="radiusVal">1.4</span></label>
+      <input type="range" id="radiusScale" min="0.3" max="4.0" value="1.4" step="0.1">
+    </div>
+    
+    <!-- 物理参数折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="physics">Physics</div>
+      <div class="accordion-content collapsed" id="physics">
+        <div class="control-group">
+          <label>Viscosity: <span id="viscosityVal">0.25</span></label>
+          <input type="range" id="viscosity" min="0" max="0.5" value="0.25" step="0.05">
+        </div>
+        <div class="control-group">
+          <label>Mouse Force: <span id="mouseForceVal">4.0</span></label>
+          <input type="range" id="mouseForce" min="0" max="5" value="4.0" step="0.5">
+        </div>
+      </div>
+    </div>
+    
+    <!-- Visual 主折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="visual">Visual</div>
+      <div class="accordion-content collapsed" id="visual">
+        <!-- Texture Size -->
+        <div class="control-group">
+          <label>Tex: <span id="texSizeVal">512</span></label>
+          <select id="texSize" style="width:100%;padding:5px;background:rgba(0,0,0,0.5);color:#0ff;border:1px solid #0ff;border-radius:4px;">
+            <option value="256">256 (Fast)</option>
+            <option value="512" selected>512 (Balanced)</option>
+            <option value="1024">1024 (Quality)</option>
+          </select>
+        </div>
+        <!-- Colors 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="colors">Colors</div>
+          <div class="sub-content collapsed" id="colors">
+            <div class="sub-control">
+              <label>Layers: <span id="colorLayersVal">4</span></label>
+              <input type="range" id="colorLayers" min="1" max="4" value="4" step="1">
+            </div>
+            <div class="color-grid">
+              <div class="color-dot" id="color1Dot" style="background: #66ffff;" title="Color 1 (Edge)"></div>
+              <div class="color-dot" id="color2Dot" style="background: #00ccff;" title="Color 2"></div>
+              <div class="color-dot" id="color3Dot" style="background: #0088cc;" title="Color 3"></div>
+              <div class="color-dot" id="color4Dot" style="background: #001133;" title="Color 4 (Center)"></div>
+            </div>
+            <div class="hsv-inline" id="hsvPanel">
+              <div class="hsv-row"><span>H</span><input type="range" id="activeColorH" min="0" max="360"></div>
+              <div class="hsv-row"><span>S</span><input type="range" id="activeColorS" min="0" max="100"></div>
+              <div class="hsv-row"><span>V</span><input type="range" id="activeColorV" min="0" max="100"></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Random 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="random">Random</div>
+          <div class="sub-content collapsed" id="random">
+            <div class="sub-control">
+              <label>Algorithm</label>
+              <select id="randomAlgo">
+                <option value="none">None</option>
+                <option value="perlin" selected>Perlin Noise</option>
+                <option value="simplex">Simplex Noise</option>
+                <option value="white">White Noise</option>
+              </select>
+            </div>
+            <div class="sub-control">
+              <label>Scale: <span id="randomScaleVal">1.4</span></label>
+              <input type="range" id="randomScale" min="0.1" max="3.0" value="1.4" step="0.1">
+            </div>
+            <div class="sub-control">
+              <label>Intensity: <span id="randomIntensityVal">0.70</span></label>
+              <input type="range" id="randomIntensity" min="0" max="1.0" value="0.70" step="0.05">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Edge 二级折叠页 -->
+        <div class="sub-accordion">
+          <div class="sub-header collapsed" data-sub="edge">Edge</div>
+          <div class="sub-content collapsed" id="edge">
+            <div class="sub-control">
+              <label>Softness: <span id="edgeSoftnessVal">0.5</span></label>
+              <input type="range" id="edgeSoftness" min="0" max="1.0" value="0.5" step="0.1">
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- Input 折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="input">Input (TensorFlow.js)</div>
+      <div class="accordion-content collapsed" id="input">
+        <div class="control-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="cameraToggle" style="cursor: pointer;">
+            <span>Camera (TensorFlow.js Handpose)</span>
+          </label>
+        </div>
+        <div class="control-group" id="cameraLoading" style="display: none; color: #ff0; font-size: 11px;">
+          <span class="spinner"></span>Loading model...
+        </div>
+        <!-- Camera Preview -->
+        <div class="control-group" id="cameraPreview" style="display: none; text-align: center;">
+          <div style="position: relative; display: inline-block;">
+            <video id="handVideo" width="200" height="150" autoplay playsinline muted style="border: 1px solid #0ff; border-radius: 4px; transform: scaleX(-1);"></video>
+            <canvas id="handCanvas" width="200" height="150" style="position: absolute; top: 0; left: 0; border: 1px solid #0ff; border-radius: 4px; pointer-events: none; transform: scaleX(-1);"></canvas>
+          </div>
+        </div>
+        <div class="control-group" id="handStatus" style="display: none;">
+          <label>Hand Position:</label>
+          <div style="font-family: monospace; font-size: 11px; color: #0ff; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 3px;">
+            X: <span id="handX">--</span><br>
+            Y: <span id="handY">--</span><br>
+            <span id="handState" style="color: #888;">Waiting for hand...</span>
+          </div>
+        </div>
+        <div class="control-group" id="cameraError" style="display: none; color: #f66; font-size: 11px;"></div>
+      </div>
+    </div>
+    
+    <!-- Profile 折叠页 -->
+    <div class="accordion">
+      <div class="accordion-header collapsed" data-accordion="profile">Profile</div>
+      <div class="accordion-content collapsed" id="profile">
+        <div class="control-group">
+          <label>FPS Limit: <span id="fpsLimitVal">60</span></label>
+          <select id="fpsLimit" style="width: 100%; padding: 5px; background: rgba(0,0,0,0.5); color: #0ff; border: 1px solid #0ff; border-radius: 4px;">
+            <option value="30">30 FPS</option>
+            <option value="60" selected>60 FPS</option>
+            <option value="120">120 FPS</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stats">Active: <span id="count">0</span> | FPS: <span id="fps">0</span></div>
     </div>
   </div>
-
-  <div id="cameraPreview">
-    <video id="previewVideo" autoplay playsinline muted></video>
-  </div>
-
-  <div id="version">v0.50 - Camera + Hand Tracking</div>
-
+  <div id="version">v1.31</div>
+  <!-- TensorFlow.js Handpose -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
+  <!-- VConsole for debugging -->
+  <script src="https://cdn.jsdelivr.net/npm/vconsole@3.15.1/dist/vconsole.min.js"></script>
+  <script>new VConsole();</script>
 </body>
 </html>

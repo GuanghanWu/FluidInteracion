@@ -822,10 +822,10 @@ async function detectHands() {
         const ctx = handCanvas.getContext('2d');
         ctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
         
-        // Draw each landmark
+        // Draw each landmark (CSS handles mirror, so use raw coordinates)
         ctx.fillStyle = '#0ff';
         for (const point of landmarks) {
-          const lx = (1 - point[0] / video.videoWidth) * handCanvas.width;
+          const lx = (point[0] / video.videoWidth) * handCanvas.width;
           const ly = point[1] / video.videoHeight * handCanvas.height;
           ctx.beginPath();
           ctx.arc(lx, ly, 3, 0, Math.PI * 2);

@@ -13,9 +13,12 @@ let isCameraActive = false;
 let handTracking = {
   x: 0,
   y: 0,
+  lastX: 0.5,
+  lastY: 0.5,
   isDetected: false,
   isPinching: false,
-  isOpen: false
+  isOpen: false,
+  missCount: 0
 };
 
 // 配置

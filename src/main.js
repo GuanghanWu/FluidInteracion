@@ -713,9 +713,9 @@ function animate() {
 
 let handModel = null;
 let video = null;
-let rafId = null;
+let detectionTimer = null;
 let gestureFrameSkip = 0;
-const GESTURE_SKIP_INTERVAL = 2; // 30fps
+const GESTURE_SKIP_INTERVAL = 5; // ~10fps detection
 
 async function initHandTracking() {
   const cameraLoading = document.getElementById('cameraLoading');
@@ -756,13 +756,13 @@ async function detectHands() {
   
   gestureFrameSkip++;
   if (gestureFrameSkip < GESTURE_SKIP_INTERVAL) {
-    rafId = requestAnimationFrame(detectHands);
+    detectionTimer = setTimeout(detectHands, 16); // ~60fps check, actual detection every 6th frame
     return;
   }
   gestureFrameSkip = 0;
   
   if (video.videoWidth === 0 || video.videoHeight === 0) {
-    rafId = requestAnimationFrame(detectHands);
+    detectionTimer = setTimeout(detectHands, 16);
     return;
   }
   
@@ -856,7 +856,7 @@ async function detectHands() {
   }
   
   if (isCameraActive) {
-    rafId = requestAnimationFrame(detectHands);
+    detectionTimer = setTimeout(detectHands, 16);
   }
 }
 
@@ -884,7 +884,7 @@ async function startCamera() {
     }
     
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 480, height: 480 },
+      video: { width: 320, height: 320 },
       audio: false
     });
     video.srcObject = stream;
@@ -916,9 +916,9 @@ function stopCamera() {
   handTracking.isDetected = false;
   handTracking.missCount = 0;
   
-  if (rafId) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
+  if (detectionTimer) {
+    clearTimeout(detectionTimer);
+    detectionTimer = null;
   }
   
   if (video && video.srcObject) {

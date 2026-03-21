@@ -13,6 +13,8 @@ let isCameraActive = false;
 let handTracking = {
   x: 0,
   y: 0,
+  targetX: 0,
+  targetY: 0,
   lastX: 0.5,
   lastY: 0.5,
   isDetected: false,
@@ -667,6 +669,13 @@ function animate() {
   
   const now = performance.now();
   
+  // 手势位置插值（检测间隔内平滑过渡）
+  if (handTracking.isDetected) {
+    const lerpFactor = 0.15; // 平滑系数，越大跟随越快
+    handTracking.x += (handTracking.targetX - handTracking.x) * lerpFactor;
+    handTracking.y += (handTracking.targetY - handTracking.y) * lerpFactor;
+  }
+  
   // 物理更新（每帧都执行，保证触控响应）
   solver.step();
   applyMouseForce();
@@ -805,10 +814,10 @@ async function detectHands() {
       handTracking.lastX = handTracking.lastX * (1 - 0.3) + normalizedX * 0.3;
       handTracking.lastY = handTracking.lastY * (1 - 0.3) + normalizedY * 0.3;
       
-      // Convert to world coordinates
+      // Update target for smooth interpolation
       const aspect = window.innerWidth / window.innerHeight;
-      handTracking.x = (handTracking.lastX * 2 - 1) * aspect;
-      handTracking.y = -(handTracking.lastY * 2 - 1);
+      handTracking.targetX = (handTracking.lastX * 2 - 1) * aspect;
+      handTracking.targetY = -(handTracking.lastY * 2 - 1);
       handTracking.isDetected = true;
       handTracking.missCount = 0;
       
